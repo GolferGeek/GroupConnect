@@ -58,7 +58,7 @@ URL: string
 
 ## 4. High-Level Project Plan
 
-### 4.1. Week 1
+### 4.1. Week 1 (mostly done)
 - Set up the project
 - Create the React app
 - Create the Ionic app
