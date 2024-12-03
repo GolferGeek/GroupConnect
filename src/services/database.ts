@@ -32,20 +32,14 @@ export interface UserProfile {
   id: string;
   email: string;
   username: string;
-  created_at: string;
+  created_at?: string;
 }
 
 // User operations
-export const createUserProfile = async (user: User) => {
+export const createUserProfile = async (userData: Omit<UserProfile, 'created_at'>) => {
   const { error } = await supabase
     .from('profiles')
-    .insert([
-      {
-        id: user.id,
-        email: user.email,
-        username: user.email?.split('@')[0],
-      },
-    ]);
+    .insert([userData]);
   if (error) throw error;
 };
 

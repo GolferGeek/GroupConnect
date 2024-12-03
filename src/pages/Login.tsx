@@ -8,7 +8,6 @@ import {
   IonButton,
   IonSegment,
   IonSegmentButton,
-  IonText,
   IonCard,
   IonCardContent,
   useIonToast,
@@ -16,6 +15,12 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { createUserProfile } from '../services/database';
 import { useHistory } from 'react-router-dom';
+
+interface SignUpData {
+  email: string;
+  username: string;
+  id: string;
+}
 
 const Login: React.FC = () => {
   const [mode, setMode] = useState<'login' | 'signup'>('login');
@@ -38,7 +43,12 @@ const Login: React.FC = () => {
       } else {
         const { data: { user } } = await signUp(email, password);
         if (user) {
-          await createUserProfile({ ...user, email, username });
+          const userData: SignUpData = {
+            id: user.id,
+            email: user.email || '',
+            username
+          };
+          await createUserProfile(userData);
           present({
             message: 'Check your email for verification link',
             duration: 3000,
@@ -47,9 +57,9 @@ const Login: React.FC = () => {
           });
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       present({
-        message: error.message || 'An error occurred',
+        message: error?.message || 'An error occurred',
         duration: 3000,
         position: 'top',
         color: 'danger'

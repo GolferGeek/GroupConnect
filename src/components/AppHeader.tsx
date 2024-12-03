@@ -18,9 +18,13 @@ import { useHistory } from 'react-router-dom';
 interface AppHeaderProps {
   title: string;
   showBackButton?: boolean;
+  actions?: Array<{
+    icon: string;
+    handler: () => void;
+  }>;
 }
 
-const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton = false }) => {
+const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton = false, actions }) => {
   const { user, session, signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const history = useHistory();

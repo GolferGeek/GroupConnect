@@ -28,8 +28,6 @@ import './theme/variables.css';
 
 setupIonicReact();
 
-const BASE_URL = import.meta.env.PROD ? '/GroupConnect' : '';
-
 const PrivateRoute: React.FC<{ component: React.ComponentType } & RouteProps> = ({
   component: Component,
   ...rest
@@ -40,7 +38,7 @@ const PrivateRoute: React.FC<{ component: React.ComponentType } & RouteProps> = 
     <Route
       {...rest}
       render={props =>
-        loading ? null : user ? <Component {...props} /> : <Redirect to={`${BASE_URL}/login`} />
+        loading ? null : user ? <Component {...props} /> : <Redirect to="/login" />
       }
     />
   );
@@ -48,14 +46,14 @@ const PrivateRoute: React.FC<{ component: React.ComponentType } & RouteProps> = 
 
 const AppContent: React.FC = () => (
   <IonApp>
-    <IonReactRouter basename={BASE_URL}>
+    <IonReactRouter>
       <IonRouterOutlet>
         <Route exact path="/login">
           <Login />
         </Route>
         <PrivateRoute exact path="/home" component={Home} />
         <PrivateRoute path="/tabs" component={MainTabs} />
-        <Redirect exact from="/" to="/tabs" />
+        <Redirect exact from="/" to="/tabs/groups" />
       </IonRouterOutlet>
     </IonReactRouter>
   </IonApp>

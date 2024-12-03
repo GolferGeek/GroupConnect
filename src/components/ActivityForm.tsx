@@ -126,7 +126,6 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
               value={formData.group_id}
               onIonChange={e => handleChange('group_id', e.detail.value)}
               placeholder="Select group"
-              required
             >
               {groups.map(group => (
                 <IonSelectOption key={group.id} value={group.id}>
@@ -141,7 +140,12 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
           <IonLabel position="stacked">Date and Time *</IonLabel>
           <IonDatetime
             value={formData.date}
-            onIonChange={e => handleChange('date', e.detail.value!)}
+            onIonChange={e => {
+              const value = e.detail.value;
+              if (value) {
+                handleChange('date', typeof value === 'string' ? value : value[0]);
+              }
+            }}
             min={new Date().toISOString()}
           />
         </IonItem>
