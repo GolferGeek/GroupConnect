@@ -5,9 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "tsc && vite build",
     "preview": "vite preview",
-    "predeploy": "npm run build",
     "test.e2e": "cypress run",
     "test.unit": "vitest",
     "lint": "eslint"
@@ -43,7 +42,6 @@
     "cypress": "^13.5.0",
     "eslint": "^8.35.0",
     "eslint-plugin-react": "^7.32.2",
-    "gh-pages": "^6.2.0",
     "jsdom": "^22.1.0",
     "terser": "^5.4.0",
     "typescript": "^5.1.6",
