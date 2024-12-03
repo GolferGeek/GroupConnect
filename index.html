@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>GroupConnect</title>
     
-    <base href="/" />
+    <base href="<%= process.env.NODE_ENV === 'production' ? '/GroupConnect/' : '/' %>" />
     
     <meta name="color-scheme" content="light dark" />
     <meta
