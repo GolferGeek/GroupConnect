@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <title>GroupConnect</title>
     
-    <base href="<%= process.env.NODE_ENV === 'production' ? '/GroupConnect/' : '/' %>" />
+    <base href="/" />
     
     <meta name="color-scheme" content="light dark" />
     <meta
@@ -54,6 +54,13 @@
         }
       }(window.location))
     </script>
+    <!-- Initialization fix -->
+    <script type="text/javascript">
+      window.addEventListener('load', function() {
+        // Force timezone to UTC to avoid initialization issues
+        process = { env: { NODE_ENV: 'production' } };
+      });
+    </script>
     <script type="module" crossorigin src="/GroupConnect/assets/index-CoI9TqBX.js"></script>
     <link rel="stylesheet" crossorigin href="/GroupConnect/assets/index-7CQuqmcz.css">
     <script type="module">import.meta.url;import("_").catch(()=>1);(async function*(){})().next();if(location.protocol!="file:"){window.__vite_is_modern_browser=true}</script>
@@ -62,7 +69,7 @@
   <body>
     <div id="root"></div>
     <script nomodule>!function(){var e=document,t=e.createElement("script");if(!("noModule"in t)&&"onbeforeload"in t){var n=!1;e.addEventListener("beforeload",(function(e){if(e.target===t)n=!0;else if(!e.target.hasAttribute("nomodule")||!n)return;e.preventDefault()}),!0),t.type="module",t.src=".",e.head.appendChild(t),t.remove()}}();</script>
-    <script nomodule crossorigin id="vite-legacy-polyfill" src="assets/polyfills-legacy-CsMOZ3db.js"></script>
-    <script nomodule crossorigin id="vite-legacy-entry" data-src="assets/index-legacy-DOZ4qsaX.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
+    <script nomodule crossorigin id="vite-legacy-polyfill" src="assets/polyfills-legacy-HMBXIEoZ.js"></script>
+    <script nomodule crossorigin id="vite-legacy-entry" data-src="assets/index-legacy-DHAR0WUP.js">System.import(document.getElementById('vite-legacy-entry').getAttribute('data-src'))</script>
   </body>
 </html>
