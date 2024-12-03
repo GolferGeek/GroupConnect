@@ -28,6 +28,13 @@ export interface GroupMember {
   created_at: string;
 }
 
+export interface UserProfile {
+  id: string;
+  email: string;
+  username: string;
+  created_at: string;
+}
+
 // User operations
 export const createUserProfile = async (user: User) => {
   const { error } = await supabase
@@ -40,6 +47,17 @@ export const createUserProfile = async (user: User) => {
       },
     ]);
   if (error) throw error;
+};
+
+export const getUserProfile = async (userId: string): Promise<UserProfile> => {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .single();
+
+  if (error) throw error;
+  return data;
 };
 
 // Group operations

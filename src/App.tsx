@@ -3,6 +3,8 @@ import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import Groups from './pages/Groups';
+import GroupDetails from './pages/GroupDetails';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 
 /* Core CSS required for Ionic components to work properly */
@@ -47,12 +49,14 @@ const AppContent: React.FC = () => (
   <IonApp>
     <IonReactRouter>
       <IonRouterOutlet>
-        <PrivateRoute exact path="/home" component={Home} />
         <Route exact path="/login">
           <Login />
         </Route>
+        <PrivateRoute exact path="/home" component={Home} />
+        <PrivateRoute exact path="/groups" component={Groups} />
+        <PrivateRoute exact path="/groups/:groupId" component={GroupDetails} />
         <Route exact path="/">
-          <Redirect to="/home" />
+          <Redirect to="/groups" />
         </Route>
       </IonRouterOutlet>
     </IonReactRouter>
