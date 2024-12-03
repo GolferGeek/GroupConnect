@@ -1,5 +1,5 @@
 {
-  "name": "groupConnect",
+  "name": "group-connect",
   "private": true,
   "version": "0.0.1",
   "type": "module",
@@ -47,5 +47,5 @@
     "vite": "~5.2.0",
     "vitest": "^0.34.6"
   },
-  "description": "An Ionic project"
+  "description": "A simple app for creating and managing groups of people and their shared activities."
 }
