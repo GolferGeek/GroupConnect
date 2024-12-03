@@ -2,8 +2,6 @@ import { useState } from 'react';
 import {
   IonContent,
   IonPage,
-  IonItem,
-  IonLabel,
   IonInput,
   IonButton,
   IonSegment,
@@ -82,38 +80,40 @@ const Login: React.FC = () => {
                 <IonSegmentButton value="signup">Sign Up</IonSegmentButton>
               </IonSegment>
 
-              <form onSubmit={handleSubmit} style={{ marginTop: '1rem' }}>
-                {mode === 'signup' && (
-                  <IonItem>
-                    <IonLabel position="floating">Username</IonLabel>
+              <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                  {mode === 'signup' && (
                     <IonInput
+                      label="Username"
+                      labelPlacement="floating"
+                      fill="solid"
                       type="text"
                       value={username}
-                      onIonChange={e => setUsername(e.detail.value!)}
+                      onIonInput={e => setUsername(e.detail.value!)}
                       required
                     />
-                  </IonItem>
-                )}
+                  )}
 
-                <IonItem>
-                  <IonLabel position="floating">Email</IonLabel>
                   <IonInput
+                    label="Email"
+                    labelPlacement="floating"
+                    fill="solid"
                     type="email"
                     value={email}
-                    onIonChange={e => setEmail(e.detail.value!)}
+                    onIonInput={e => setEmail(e.detail.value!)}
                     required
                   />
-                </IonItem>
 
-                <IonItem>
-                  <IonLabel position="floating">Password</IonLabel>
                   <IonInput
+                    label="Password"
+                    labelPlacement="floating"
+                    fill="solid"
                     type="password"
                     value={password}
-                    onIonChange={e => setPassword(e.detail.value!)}
+                    onIonInput={e => setPassword(e.detail.value!)}
                     required
                   />
-                </IonItem>
+                </div>
 
                 <IonButton
                   expand="block"

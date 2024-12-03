@@ -1,20 +1,16 @@
 import React from 'react';
 import {
   IonTabs,
-  IonTabBar,
-  IonTabButton,
-  IonIcon,
-  IonLabel,
   IonRouterOutlet,
 } from '@ionic/react';
 import { Route, Redirect } from 'react-router';
-import { peopleOutline, calendarOutline } from 'ionicons/icons';
 import Groups from './Groups';
 import Activities from './Activities';
 import GroupDetails from './GroupDetails';
 import ActivityDetails from './ActivityDetails';
 import CreateActivity from './CreateActivity';
 import EditActivity from './EditActivity';
+import AppTabBar from '../components/AppTabBar';
 
 const MainTabs: React.FC = () => {
   return (
@@ -44,18 +40,11 @@ const MainTabs: React.FC = () => {
         <Route exact path="/tabs">
           <Redirect to="/tabs/groups" />
         </Route>
+        <Route>
+          <Redirect to="/tabs/groups" />
+        </Route>
       </IonRouterOutlet>
-
-      <IonTabBar slot="bottom">
-        <IonTabButton tab="groups" href="/tabs/groups">
-          <IonIcon icon={peopleOutline} />
-          <IonLabel>Groups</IonLabel>
-        </IonTabButton>
-        <IonTabButton tab="activities" href="/tabs/activities">
-          <IonIcon icon={calendarOutline} />
-          <IonLabel>Activities</IonLabel>
-        </IonTabButton>
-      </IonTabBar>
+      <AppTabBar />
     </IonTabs>
   );
 };

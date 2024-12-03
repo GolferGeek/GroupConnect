@@ -25,6 +25,13 @@ import {
   IonItemOptions,
   IonItemOption,
   useIonViewWillEnter,
+  IonModal,
+  IonSearchbar,
+  IonNote,
+  IonHeader,
+  IonToolbar,
+  IonTitle,
+  IonButtons,
 } from '@ionic/react';
 import {
   peopleOutline,
@@ -38,6 +45,7 @@ import {
   linkOutline,
   createOutline,
   trashOutline,
+  closeOutline,
 } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -93,6 +101,9 @@ const GroupDetailsPage: React.FC = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [showAddMemberModal, setShowAddMemberModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
 
   useIonViewWillEnter(() => {
     loadGroupData();
@@ -110,6 +121,12 @@ const GroupDetailsPage: React.FC = () => {
       loadActivities();
     }
   }, [activeTab, groupId]);
+
+  useEffect(() => {
+    if (activeTab === 'members') {
+      console.log('Members tab active, current members:', members);
+    }
+  }, [activeTab]);
 
   const loadGroupData = async () => {
     if (!groupId) return;
@@ -354,6 +371,78 @@ const GroupDetailsPage: React.FC = () => {
     }
   };
 
+  const searchUsers = async (query: string) => {
+    if (query.length < 3) {
+      setSearchResults([]);
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .or(`username.ilike.%${query}%,email.ilike.%${query}%`)
+        .not('id', 'eq', user?.id)
+        .not('id', 'in', `(${members.map(m => m.id).join(',')})`)
+        .limit(5);
+
+      if (error) throw error;
+      
+      console.log('Search results:', data);
+      setSearchResults(data || []);
+    } catch (error: any) {
+      console.error('Search error:', error);
+      present({
+        message: error.message || 'Failed to search users',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
+  const addMember = async (userId: string) => {
+    try {
+      const { error } = await supabase
+        .from('group_members')
+        .insert([
+          {
+            group_id: groupId,
+            user_id: userId,
+            role: 'member'
+          }
+        ]);
+
+      if (error) throw error;
+
+      // Refresh the members list
+      loadGroupData();
+      setShowAddMemberModal(false);
+      setSearchTerm('');
+      setSearchResults([]);
+
+      present({
+        message: 'Member added successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+    } catch (error: any) {
+      present({
+        message: error.message || 'Failed to add member',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
+  const handleCloseModal = () => {
+    setShowAddMemberModal(false);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
+
   if (loading) {
     return (
       <IonPage>
@@ -374,7 +463,10 @@ const GroupDetailsPage: React.FC = () => {
       <IonContent>
         <IonSegment 
           value={activeTab} 
-          onIonChange={e => setActiveTab(e.detail.value as 'details' | 'members' | 'activities')}
+          onIonChange={e => {
+            console.log('Tab changed to:', e.detail.value);
+            setActiveTab(e.detail.value as 'details' | 'members' | 'activities');
+          }}
         >
           <IonSegmentButton value="details">
             <IonIcon icon={settingsOutline} />
@@ -419,11 +511,11 @@ const GroupDetailsPage: React.FC = () => {
         )}
 
         {activeTab === 'members' && (
-          <>
+          <div className="ion-padding">
             <IonList>
               {members.map(member => (
                 <IonItemSliding key={member.id}>
-                  <IonItem button onClick={() => handleMemberOptions(member)}>
+                  <IonItem>
                     <IonLabel>
                       <h2>{member.username}</h2>
                       <p>{member.email}</p>
@@ -431,9 +523,6 @@ const GroupDetailsPage: React.FC = () => {
                     <IonBadge color={member.role === 'admin' ? 'success' : 'medium'} slot="end">
                       {member.role}
                     </IonBadge>
-                    {isUserAdmin && member.id !== user?.id && (
-                      <IonIcon icon={ellipsisHorizontal} slot="end" />
-                    )}
                   </IonItem>
                   {isUserAdmin && member.id !== user?.id && (
                     <IonItemOptions side="end">
@@ -454,12 +543,66 @@ const GroupDetailsPage: React.FC = () => {
 
             {isUserAdmin && (
               <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                <IonFabButton>
+                <IonFabButton onClick={() => {
+                  console.log('Add member button clicked');
+                  setShowAddMemberModal(true);
+                }}>
                   <IonIcon icon={personAddOutline} />
                 </IonFabButton>
               </IonFab>
             )}
-          </>
+
+            <IonModal 
+              isOpen={showAddMemberModal} 
+              onDidDismiss={handleCloseModal}
+              presentingElement={document.querySelector('ion-page') as HTMLElement | undefined}
+            >
+              <IonHeader>
+                <IonToolbar>
+                  <IonTitle>Add Member</IonTitle>
+                  <IonButtons slot="end">
+                    <IonButton onClick={handleCloseModal}>Close</IonButton>
+                  </IonButtons>
+                </IonToolbar>
+              </IonHeader>
+
+              <IonContent className="ion-padding">
+                <IonSearchbar
+                  value={searchTerm}
+                  onIonInput={e => {
+                    const value = e.detail.value!;
+                    console.log('Search term:', value);
+                    setSearchTerm(value);
+                    searchUsers(value);
+                  }}
+                  placeholder="Search by username or email"
+                  debounce={300}
+                />
+
+                {searchTerm.length > 0 && searchTerm.length < 3 && (
+                  <IonNote className="ion-padding">
+                    Type at least 3 characters to search
+                  </IonNote>
+                )}
+
+                <IonList>
+                  {searchResults.map(user => (
+                    <IonItem key={user.id} button onClick={() => addMember(user.id)}>
+                      <IonLabel>
+                        <h2>{user.username}</h2>
+                        <p>{user.email}</p>
+                      </IonLabel>
+                    </IonItem>
+                  ))}
+                  {searchTerm.length >= 3 && searchResults.length === 0 && (
+                    <IonItem>
+                      <IonLabel>No users found</IonLabel>
+                    </IonItem>
+                  )}
+                </IonList>
+              </IonContent>
+            </IonModal>
+          </div>
         )}
 
         {activeTab === 'activities' && (

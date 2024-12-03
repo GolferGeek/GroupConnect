@@ -53,7 +53,9 @@ const AppContent: React.FC = () => (
         </Route>
         <PrivateRoute exact path="/home" component={Home} />
         <PrivateRoute path="/tabs" component={MainTabs} />
-        <Redirect exact from="/" to="/tabs/groups" />
+        <Route exact path="/">
+          <Redirect to="/tabs/groups" />
+        </Route>
       </IonRouterOutlet>
     </IonReactRouter>
   </IonApp>
