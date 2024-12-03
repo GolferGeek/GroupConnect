@@ -24,6 +24,7 @@ import {
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
+  useIonViewWillEnter,
 } from '@ionic/react';
 import {
   peopleOutline,
@@ -33,8 +34,12 @@ import {
   personAddOutline,
   timeOutline,
   ellipsisHorizontal,
+  locationOutline,
+  linkOutline,
+  createOutline,
+  trashOutline,
 } from 'ionicons/icons';
-import { useParams } from 'react-router-dom';
+import { useParams, useHistory } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../config/supabase';
 import { getUserProfile, UserProfile } from '../services/database';
@@ -65,8 +70,19 @@ interface MemberData {
   };
 }
 
+interface Activity {
+  id: string;
+  title: string;
+  description?: string;
+  date: string;
+  location?: string;
+  url?: string;
+  notes?: string;
+}
+
 const GroupDetailsPage: React.FC = () => {
   const { groupId } = useParams<{ groupId: string }>();
+  const history = useHistory();
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [members, setMembers] = useState<GroupMemberDetails[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'members' | 'activities'>('details');
@@ -75,10 +91,25 @@ const GroupDetailsPage: React.FC = () => {
   const [present] = useIonToast();
   const [presentActionSheet] = useIonActionSheet();
   const [isEditing, setIsEditing] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
+  useIonViewWillEnter(() => {
+    loadGroupData();
+    if (activeTab === 'activities') {
+      loadActivities();
+    }
+  });
 
   useEffect(() => {
     loadGroupData();
   }, [groupId]);
+
+  useEffect(() => {
+    if (activeTab === 'activities') {
+      loadActivities();
+    }
+  }, [activeTab, groupId]);
 
   const loadGroupData = async () => {
     if (!groupId) return;
@@ -124,6 +155,40 @@ const GroupDetailsPage: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadActivities = async () => {
+    if (!groupId) return;
+    try {
+      const { data, error } = await supabase
+        .from('activities')
+        .select('*')
+        .eq('group_id', groupId)
+        .gte('date', new Date().toISOString())
+        .order('date', { ascending: true });
+
+      if (error) throw error;
+      setActivities(data || []);
+    } catch (error: any) {
+      present({
+        message: error.message || 'Failed to load activities',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString(undefined, {
+      weekday: 'short',
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
   const isUserAdmin = members.find(m => m.id === user?.id)?.role === 'admin';
@@ -252,6 +317,43 @@ const GroupDetailsPage: React.FC = () => {
     }
   };
 
+  const handleActivityClick = (activity: Activity) => {
+    setSelectedActivity(activity);
+  };
+
+  const handleCloseActivity = () => {
+    setSelectedActivity(null);
+  };
+
+  const handleDeleteActivity = async (activityId: string) => {
+    try {
+      const { error } = await supabase
+        .from('activities')
+        .delete()
+        .eq('id', activityId);
+
+      if (error) throw error;
+      
+      // Update local state
+      setActivities(activities.filter(a => a.id !== activityId));
+      setSelectedActivity(null);
+      
+      present({
+        message: 'Activity deleted successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+    } catch (error: any) {
+      present({
+        message: error.message || 'Failed to delete activity',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <IonPage>
@@ -361,15 +463,135 @@ const GroupDetailsPage: React.FC = () => {
         )}
 
         {activeTab === 'activities' && (
-          <div className="ion-padding ion-text-center">
-            <IonText color="medium">
-              <p>Activities feature coming soon!</p>
-            </IonText>
-            <IonFab vertical="bottom" horizontal="end" slot="fixed">
-              <IonFabButton>
-                <IonIcon icon={addOutline} />
-              </IonFabButton>
-            </IonFab>
+          <div className="ion-padding">
+            {selectedActivity ? (
+              <>
+                <IonCard>
+                  <IonCardHeader>
+                    <IonCardTitle>{selectedActivity.title}</IonCardTitle>
+                    <IonCardSubtitle>{formatDate(selectedActivity.date)}</IonCardSubtitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    <IonItem lines="none">
+                      <IonIcon icon={timeOutline} slot="start" />
+                      <IonLabel>{formatDate(selectedActivity.date)}</IonLabel>
+                    </IonItem>
+
+                    {selectedActivity.location && (
+                      <IonItem lines="none">
+                        <IonIcon icon={locationOutline} slot="start" />
+                        <IonLabel>{selectedActivity.location}</IonLabel>
+                      </IonItem>
+                    )}
+
+                    {selectedActivity.url && (
+                      <IonItem lines="none" href={selectedActivity.url} target="_blank">
+                        <IonIcon icon={linkOutline} slot="start" />
+                        <IonLabel>Meeting Link</IonLabel>
+                      </IonItem>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+
+                {selectedActivity.description && (
+                  <div className="ion-margin-top">
+                    <MarkdownViewer content={selectedActivity.description} />
+                  </div>
+                )}
+
+                {selectedActivity.notes && (
+                  <IonCard className="ion-margin-top">
+                    <IonCardHeader>
+                      <IonCardTitle>Notes</IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <MarkdownViewer content={selectedActivity.notes} />
+                    </IonCardContent>
+                  </IonCard>
+                )}
+
+                <div className="ion-padding">
+                  <IonButton expand="block" onClick={handleCloseActivity}>
+                    Back to Activities
+                  </IonButton>
+                  {isUserAdmin && (
+                    <>
+                      <IonButton 
+                        expand="block" 
+                        color="primary"
+                        onClick={() => history.push(`/tabs/activities/${selectedActivity.id}/edit`)}
+                      >
+                        <IonIcon slot="start" icon={createOutline} />
+                        Edit Activity
+                      </IonButton>
+                      <IonButton 
+                        expand="block" 
+                        color="danger"
+                        onClick={() => handleDeleteActivity(selectedActivity.id)}
+                      >
+                        <IonIcon slot="start" icon={trashOutline} />
+                        Delete Activity
+                      </IonButton>
+                    </>
+                  )}
+                </div>
+              </>
+            ) : (
+              <>
+                {activities.length === 0 ? (
+                  <div className="ion-text-center">
+                    <IonIcon
+                      icon={calendarOutline}
+                      style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
+                    />
+                    <IonText color="medium">
+                      <p>No upcoming activities</p>
+                      <p>Create one to get started!</p>
+                    </IonText>
+                  </div>
+                ) : (
+                  <IonList>
+                    {activities.map(activity => (
+                      <IonItemSliding key={activity.id}>
+                        <IonItem button onClick={() => history.push(`/tabs/activities/${activity.id}`)}>
+                          <IonLabel>
+                            <h2>{activity.title}</h2>
+                            <p>{formatDate(activity.date)}</p>
+                            {activity.location && <p>{activity.location}</p>}
+                          </IonLabel>
+                        </IonItem>
+                        <IonItemOptions side="end">
+                          <IonItemOption 
+                            color="primary" 
+                            onClick={() => history.push(`/tabs/activities/${activity.id}`)}
+                          >
+                            <IonIcon slot="start" icon={createOutline} />
+                            Details
+                          </IonItemOption>
+                          {isUserAdmin && (
+                            <IonItemOption 
+                              color="danger" 
+                              onClick={() => handleDeleteActivity(activity.id)}
+                            >
+                              <IonIcon slot="start" icon={trashOutline} />
+                              Delete
+                            </IonItemOption>
+                          )}
+                        </IonItemOptions>
+                      </IonItemSliding>
+                    ))}
+                  </IonList>
+                )}
+                
+                {isUserAdmin && (
+                  <IonFab vertical="bottom" horizontal="end" slot="fixed">
+                    <IonFabButton onClick={() => history.push(`/tabs/groups/${groupId}/activities/new`)}>
+                      <IonIcon icon={addOutline} />
+                    </IonFabButton>
+                  </IonFab>
+                )}
+              </>
+            )}
           </div>
         )}
       </IonContent>

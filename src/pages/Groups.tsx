@@ -64,7 +64,7 @@ const Groups: React.FC = () => {
       setGroups([...groups, group]);
       setIsModalOpen(false);
       setNewGroupName('');
-      history.push(`/groups/${group.id}`);
+      history.push(`/tabs/groups/${group.id}`);
     } catch (error) {
       present({
         message: 'Failed to create group',
@@ -107,7 +107,7 @@ const Groups: React.FC = () => {
               <IonItem
                 key={group.id}
                 button
-                onClick={() => history.push(`/groups/${group.id}`)}
+                onClick={() => history.push(`/tabs/groups/${group.id}`)}
               >
                 <IonLabel>
                   <h2>{group.name}</h2>
