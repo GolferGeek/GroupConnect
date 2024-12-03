@@ -23,9 +23,9 @@ Typical activities might include:
 Most importantly, the activities should be private.  Only the users in the group should be able to see the activities.  And be the most simple and easy-to-use system for doing so.
 
 ## 2. Technical Overview
-This is an Ionic/React app that uses Firebase for the backend.  
+This is an Ionic/React app that uses Supabase for the backend.  
 
-We will use the Firebase Authentication system for login.  We will use the Firebase Firestore Database for the backend database.  We will use the Firebase Storage for file uploads (like group photos).  We will be hosting the app on Firebase Hosting.
+We will use the Supabase Authentication system for login.  We will use the Supabase Database for the backend database.  We will use the Supabase Storage for file uploads (like group photos).  We will be hosting the app on Github Pages.
 
 We will use the Capacitor library to package the app for the different app stores.  We want to be able to run the app natively on iOS and Android devices. This includes using the device's calendar and notifications system.  We will also be able to run the app in a web browser, but we don't need to worry about browser notifications.  We want the user to be able to authenticate using their Google account and their phone's built-in authentication system-- like Face ID or Touch ID on iOS and Android devices.
 
@@ -62,7 +62,7 @@ URL: string
 - Set up the project
 - Create the React app
 - Create the Ionic app
-- Create the Firebase backend
+- Create the Supabase backend
 - Create the Capacitor configuration
 - Create the authentication system
 - Create the user model in the Firestore database
@@ -81,7 +81,7 @@ URL: string
 - User can remove themselves from a group
 - User can send an email invitation to another user to join a group (and also sign up to the app)
 - User can simply add another user to a group (this would require a search function to find the user by email or username)
-- Deploy the app to Firebase Hosting
+- Deploy the app to Github Pages
 - Deploy to local iOS device
 
 
