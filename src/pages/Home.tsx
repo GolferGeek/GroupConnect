@@ -5,8 +5,6 @@ import {
   IonIcon,
   IonText,
   useIonToast,
-  IonTabs,
-  IonRouterOutlet,
 } from '@ionic/react';
 import { personCircleOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -21,10 +19,15 @@ const Home: React.FC = () => {
   const [present] = useIonToast();
 
   useEffect(() => {
+    console.log('Home page mounted, user:', user);
     if (user) {
       getUserProfile(user.id)
-        .then(setProfile)
+        .then(userProfile => {
+          console.log('Loaded user profile:', userProfile);
+          setProfile(userProfile);
+        })
         .catch(error => {
+          console.error('Failed to load profile:', error);
           present({
             message: 'Failed to load profile',
             duration: 3000,
@@ -37,30 +40,26 @@ const Home: React.FC = () => {
 
   return (
     <IonPage>
-      <IonTabs>
-        <IonRouterOutlet>
-          <IonContent className="ion-padding">
-            <AppHeader title="GroupConnect" />
-            <div className="ion-text-center ion-padding">
-              <IonIcon
-                icon={personCircleOutline}
-                style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
-              />
-              <IonText>
-                <h2>Welcome, {profile?.username || 'User'}!</h2>
-                <p>{profile?.email}</p>
-              </IonText>
-            </div>
+      <AppHeader title="GroupConnect" />
+      <IonContent className="ion-padding">
+        <div className="ion-text-center ion-padding">
+          <IonIcon
+            icon={personCircleOutline}
+            style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
+          />
+          <IonText>
+            <h2>Welcome, {profile?.username || 'User'}!</h2>
+            <p>{profile?.email}</p>
+          </IonText>
+        </div>
 
-            <div className="ion-padding">
-              <p className="ion-text-center">
-                Start by creating a group or joining one through an invitation.
-              </p>
-            </div>
-          </IonContent>
-        </IonRouterOutlet>
-        <AppTabBar />
-      </IonTabs>
+        <div className="ion-padding">
+          <p className="ion-text-center">
+            Start by creating a group or joining one through an invitation.
+          </p>
+        </div>
+      </IonContent>
+      <AppTabBar />
     </IonPage>
   );
 };

@@ -16,6 +16,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../config/supabase';
 import { useHistory } from 'react-router-dom';
 import AppHeader from '../components/AppHeader';
+import AppTabBar from '../components/AppTabBar';
 
 interface Activity {
   id: string;
@@ -88,6 +89,7 @@ const Activities: React.FC = () => {
             <IonSpinner />
           </div>
         </IonContent>
+        <AppTabBar />
       </IonPage>
     );
   }
@@ -113,7 +115,7 @@ const Activities: React.FC = () => {
               <IonItem
                 key={activity.id}
                 button
-                onClick={() => history.push(`/tabs/activities/${activity.id}`)}
+                onClick={() => history.push(`/activities/${activity.id}`)}
               >
                 <IonLabel>
                   <h2>{activity.title}</h2>
@@ -128,6 +130,7 @@ const Activities: React.FC = () => {
           </IonList>
         )}
       </IonContent>
+      <AppTabBar />
     </IonPage>
   );
 };

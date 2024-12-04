@@ -89,7 +89,7 @@ interface Activity {
 }
 
 const GroupDetailsPage: React.FC = () => {
-  const { groupId } = useParams<{ groupId: string }>();
+  const { id: groupId } = useParams<{ id: string }>();
   const history = useHistory();
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
   const [members, setMembers] = useState<GroupMemberDetails[]>([]);
@@ -113,6 +113,7 @@ const GroupDetailsPage: React.FC = () => {
   });
 
   useEffect(() => {
+    console.log('Loading group data for ID:', groupId);
     loadGroupData();
   }, [groupId]);
 
@@ -129,8 +130,20 @@ const GroupDetailsPage: React.FC = () => {
   }, [activeTab]);
 
   const loadGroupData = async () => {
-    if (!groupId) return;
+    if (!groupId) {
+      console.error('No group ID provided');
+      present({
+        message: 'No group ID provided',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+      history.push('/groups');
+      return;
+    }
+
     try {
+      console.log('Fetching members data...');
       // First get members to get accurate count
       const { data: membersData, error: membersError } = await supabase
         .from('group_members')
@@ -139,6 +152,7 @@ const GroupDetailsPage: React.FC = () => {
 
       if (membersError) throw membersError;
       
+      console.log('Members data:', membersData);
       const formattedMembers = (membersData as unknown as MemberData[]).map(member => ({
         ...member.profiles,
         role: member.role
@@ -146,6 +160,7 @@ const GroupDetailsPage: React.FC = () => {
 
       setMembers(formattedMembers);
 
+      console.log('Fetching group details...');
       // Load group details and activity count
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
@@ -154,7 +169,8 @@ const GroupDetailsPage: React.FC = () => {
         .single();
 
       if (groupError) throw groupError;
-
+      
+      console.log('Group data:', groupData);
       // Set group details with correct member count
       setGroupDetails({
         ...groupData,
@@ -163,12 +179,14 @@ const GroupDetailsPage: React.FC = () => {
       });
 
     } catch (error: any) {
+      console.error('Error loading group data:', error);
       present({
         message: error.message || 'Failed to load group data',
         duration: 3000,
         position: 'top',
         color: 'danger'
       });
+      history.push('/groups');
     } finally {
       setLoading(false);
     }
@@ -335,7 +353,7 @@ const GroupDetailsPage: React.FC = () => {
   };
 
   const handleActivityClick = (activity: Activity) => {
-    setSelectedActivity(activity);
+    history.push(`/activities/${activity.id}`);
   };
 
   const handleCloseActivity = () => {
@@ -662,7 +680,7 @@ const GroupDetailsPage: React.FC = () => {
                       <IonButton 
                         expand="block" 
                         color="primary"
-                        onClick={() => history.push(`/tabs/activities/${selectedActivity.id}/edit`)}
+                        onClick={() => history.push(`/activities/${selectedActivity.id}/edit`)}
                       >
                         <IonIcon slot="start" icon={createOutline} />
                         Edit Activity
@@ -696,7 +714,7 @@ const GroupDetailsPage: React.FC = () => {
                   <IonList>
                     {activities.map(activity => (
                       <IonItemSliding key={activity.id}>
-                        <IonItem button onClick={() => history.push(`/tabs/activities/${activity.id}`)}>
+                        <IonItem button onClick={() => history.push(`/activities/${activity.id}`)}>
                           <IonLabel>
                             <h2>{activity.title}</h2>
                             <p>{formatDate(activity.date)}</p>
@@ -706,7 +724,7 @@ const GroupDetailsPage: React.FC = () => {
                         <IonItemOptions side="end">
                           <IonItemOption 
                             color="primary" 
-                            onClick={() => history.push(`/tabs/activities/${activity.id}`)}
+                            onClick={() => history.push(`/activities/${activity.id}`)}
                           >
                             <IonIcon slot="start" icon={createOutline} />
                             Details
@@ -728,7 +746,7 @@ const GroupDetailsPage: React.FC = () => {
                 
                 {isUserAdmin && (
                   <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                    <IonFabButton onClick={() => history.push(`/tabs/groups/${groupId}/activities/new`)}>
+                    <IonFabButton onClick={() => history.push(`/groups/${groupId}/activities/new`)}>
                       <IonIcon icon={addOutline} />
                     </IonFabButton>
                   </IonFab>

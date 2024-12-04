@@ -3,8 +3,15 @@ import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import Home from './pages/Home';
 import Login from './pages/Login';
+import Groups from './pages/Groups';
+import GroupDetails from './pages/GroupDetails';
 import MainTabs from './pages/MainTabs';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import Discover from './pages/Discover';
+import Activities from './pages/Activities';
+import ActivityDetails from './pages/ActivityDetails';
+import CreateActivity from './pages/CreateActivity';
+import EditActivity from './pages/EditActivity';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -28,43 +35,68 @@ import './theme/variables.css';
 
 setupIonicReact();
 
-const PrivateRoute: React.FC<{ component: React.ComponentType } & RouteProps> = ({
-  component: Component,
-  ...rest
-}) => {
+interface PrivateRouteProps extends Omit<RouteProps, 'component'> {
+  children: React.ReactNode;
+}
+
+const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, ...rest }) => {
   const { user, loading } = useAuth();
 
   return (
     <Route
       {...rest}
       render={props =>
-        loading ? null : user ? <Component {...props} /> : <Redirect to="/login" />
+        loading ? null : user ? (
+          children
+        ) : (
+          <Redirect to="/login" />
+        )
       }
     />
   );
 };
 
-const AppContent: React.FC = () => (
-  <IonApp>
-    <IonReactRouter>
-      <IonRouterOutlet>
-        <Route exact path="/login">
-          <Login />
-        </Route>
-        <PrivateRoute exact path="/home" component={Home} />
-        <PrivateRoute path="/tabs" component={MainTabs} />
-        <Route exact path="/">
-          <Redirect to="/tabs/groups" />
-        </Route>
-      </IonRouterOutlet>
-    </IonReactRouter>
-  </IonApp>
-);
-
-const App: React.FC = () => (
-  <AuthProvider>
-    <AppContent />
-  </AuthProvider>
-);
+const App: React.FC = () => {
+  return (
+    <IonApp>
+      <AuthProvider>
+        <IonReactRouter>
+          <IonRouterOutlet>
+            <Route exact path="/login">
+              <Login />
+            </Route>
+            <PrivateRoute exact path="/home">
+              <Home />
+            </PrivateRoute>
+            <PrivateRoute exact path="/groups">
+              <Groups />
+            </PrivateRoute>
+            <PrivateRoute exact path="/discover">
+              <Discover />
+            </PrivateRoute>
+            <PrivateRoute path="/groups/:id">
+              <GroupDetails />
+            </PrivateRoute>
+            <PrivateRoute exact path="/activities">
+              <Activities />
+            </PrivateRoute>
+            <PrivateRoute exact path="/activities/:id">
+              <ActivityDetails />
+            </PrivateRoute>
+            <PrivateRoute exact path="/activities/:id/edit">
+              <EditActivity />
+            </PrivateRoute>
+            <PrivateRoute exact path="/groups/:groupId/activities/new">
+              <CreateActivity />
+            </PrivateRoute>
+            <Route exact path="/">
+              <Redirect to="/home" />
+            </Route>
+          </IonRouterOutlet>
+        </IonReactRouter>
+      </AuthProvider>
+    </IonApp>
+  );
+};
 
 export default App;
