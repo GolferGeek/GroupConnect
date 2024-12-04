@@ -49,7 +49,7 @@ interface Activity {
 }
 
 const ActivityDetails: React.FC = () => {
-  const { activityId } = useParams<{ activityId: string }>();
+  const { id: activityId } = useParams<{ id: string }>();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -59,12 +59,17 @@ const ActivityDetails: React.FC = () => {
   const [presentActionSheet] = useIonActionSheet();
 
   useEffect(() => {
+    console.log('Loading activity:', activityId);
     loadActivityData();
   }, [activityId]);
 
   const loadActivityData = async () => {
-    if (!activityId || !user) return;
+    if (!activityId || !user) {
+      console.log('Missing activityId or user');
+      return;
+    }
     try {
+      console.log('Fetching activity data...');
       // Get activity details
       const { data: activityData, error: activityError } = await supabase
         .from('activities')
@@ -73,6 +78,7 @@ const ActivityDetails: React.FC = () => {
         .single();
 
       if (activityError) throw activityError;
+      console.log('Activity data:', activityData);
       setActivity(activityData);
 
       // Check if user is admin of the group
@@ -83,17 +89,22 @@ const ActivityDetails: React.FC = () => {
         .eq('user_id', user.id)
         .single();
 
-      if (memberError) throw memberError;
-      setIsAdmin(memberData.role === 'admin');
+      if (memberError) {
+        console.error('Member check error:', memberError);
+      } else {
+        console.log('Member data:', memberData);
+        setIsAdmin(memberData.role === 'admin');
+      }
 
     } catch (error: any) {
+      console.error('Error loading activity:', error);
       present({
         message: error.message || 'Failed to load activity',
         duration: 3000,
         position: 'top',
         color: 'danger'
       });
-      history.goBack();
+      history.push('/activities');
     } finally {
       setLoading(false);
     }
@@ -142,9 +153,9 @@ const ActivityDetails: React.FC = () => {
 
       // Navigate back to the group if we have group_id
       if (activity?.group_id) {
-        history.replace(`/tabs/groups/${activity.group_id}`);
+        history.replace(`/groups/${activity.group_id}`);
       } else {
-        history.replace('/tabs/activities');
+        history.replace('/activities');
       }
     } catch (error: any) {
       present({
