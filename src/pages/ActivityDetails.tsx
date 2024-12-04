@@ -16,6 +16,8 @@ import {
   IonBadge,
   useIonToast,
   useIonActionSheet,
+  IonFab,
+  IonFabButton,
 } from '@ionic/react';
 import {
   locationOutline,
@@ -184,19 +186,10 @@ const ActivityDetails: React.FC = () => {
   return (
     <IonPage>
       <AppHeader 
-        title={activity.title} 
-        showBackButton
-        actions={
-          isAdmin ? [
-            {
-              icon: ellipsisHorizontal,
-              handler: handleOptions
-            }
-          ] : undefined
-        }
+        title={activity?.title || 'Activity'} 
+        showBackButton 
       />
-      
-      <IonContent className="ion-padding">
+      <IonContent>
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>{activity.title}</IonCardTitle>
@@ -245,6 +238,13 @@ const ActivityDetails: React.FC = () => {
           </IonCard>
         )}
       </IonContent>
+      {isAdmin && (
+        <IonFab vertical="bottom" horizontal="end" slot="fixed">
+          <IonFabButton onClick={() => history.push(`/activities/${activityId}/edit`)}>
+            <IonIcon icon={createOutline} />
+          </IonFabButton>
+        </IonFab>
+      )}
     </IonPage>
   );
 };
