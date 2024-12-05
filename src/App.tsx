@@ -12,6 +12,10 @@ import Activities from './pages/Activities';
 import ActivityDetails from './pages/ActivityDetails';
 import CreateActivity from './pages/CreateActivity';
 import EditActivity from './pages/EditActivity';
+import RoleManager from './pages/RoleManager';
+import TypeManager from './pages/TypeManager';
+import Profile from './pages/Profile';
+import AdminRoute from './components/AdminRoute';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -88,6 +92,13 @@ const App: React.FC = () => {
             </PrivateRoute>
             <PrivateRoute exact path="/groups/:groupId/activities/new">
               <CreateActivity />
+            </PrivateRoute>
+            <Route exact path="/role-manager" component={RoleManager} />
+            <AdminRoute exact path="/type-manager">
+              <TypeManager />
+            </AdminRoute>
+            <PrivateRoute exact path="/profile">
+              <Profile />
             </PrivateRoute>
             <Route exact path="/">
               <Redirect to="/home" />

@@ -10,9 +10,10 @@ import {
   IonText,
   useIonToast,
 } from '@ionic/react';
-import { logOutOutline } from 'ionicons/icons';
+import { logOutOutline, personCircleOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, UserProfile } from '../services/database';
+import { useHistory } from 'react-router-dom';
 
 interface AppHeaderProps {
   title: string;
@@ -23,6 +24,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [present] = useIonToast();
+  const history = useHistory();
 
   useEffect(() => {
     if (user) {
@@ -52,9 +54,14 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
         <IonTitle>{title}</IonTitle>
         <IonButtons slot="end">
           {profile && (
-            <IonText color="medium" className="ion-padding-end">
-              {profile.username}
-            </IonText>
+            <>
+              <IonButton onClick={() => history.push('/profile')}>
+                <IonIcon slot="icon-only" icon={personCircleOutline} />
+              </IonButton>
+              <IonText color="medium" className="ion-padding-end">
+                {profile.username}
+              </IonText>
+            </>
           )}
           <IonButton onClick={signOut}>
             <IonIcon slot="icon-only" icon={logOutOutline} />

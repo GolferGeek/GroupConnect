@@ -34,6 +34,9 @@ export interface UserProfile {
   id: string;
   email: string;
   username: string;
+  role_id: string;
+  user_type_id: number;
+  other_types?: number[];
   created_at?: string;
 }
 
@@ -72,8 +75,24 @@ export interface JoinRequest {
 export const createUserProfile = async (userData: Omit<UserProfile, 'created_at'>) => {
   const { error } = await supabase
     .from('profiles')
-    .insert([userData]);
+    .insert([{
+      ...userData,
+      role_id: userData.role_id || 'member',  // default role
+      user_type_id: userData.user_type_id,
+      other_types: userData.other_types || []
+    }]);
   if (error) throw error;
+};
+
+export const getDefaultUserTypeId = async (): Promise<number> => {
+  const { data, error } = await supabase
+    .from('user_types')
+    .select('id')
+    .limit(1)
+    .single();
+
+  if (error) throw error;
+  return data.id;
 };
 
 export const getUserProfile = async (userId: string): Promise<UserProfile> => {
@@ -83,6 +102,34 @@ export const getUserProfile = async (userId: string): Promise<UserProfile> => {
     .eq('id', userId)
     .single();
 
+  if (error) throw error;
+  return data;
+};
+
+export const updateUserProfile = async (userId: string, updates: Partial<Omit<UserProfile, 'id' | 'created_at'>>) => {
+  const { error } = await supabase
+    .from('profiles')
+    .update(updates)
+    .eq('id', userId);
+  if (error) throw error;
+};
+
+export const getUserTypes = async () => {
+  const { data, error } = await supabase
+    .from('user_types')
+    .select('*')
+    .order('name');
+  
+  if (error) throw error;
+  return data;
+};
+
+export const getUserRoles = async () => {
+  const { data, error } = await supabase
+    .from('user_roles')
+    .select('*')
+    .order('name');
+  
   if (error) throw error;
   return data;
 };

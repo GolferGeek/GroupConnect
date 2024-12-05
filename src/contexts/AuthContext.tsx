@@ -1,12 +1,14 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, AuthResponse, Session } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
+import { createUserProfile, getUserProfile, UserProfile } from '../services/database';
 
 type AuthContextType = {
   user: User | null;
   session: Session | null;
+  profile: UserProfile | null;
   loading: boolean;
-  signUp: (email: string, password: string) => Promise<AuthResponse>;
+  signUp: (email: string, password: string, username: string) => Promise<AuthResponse>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
@@ -16,6 +18,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -23,20 +26,40 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
-      setLoading(false);
+      if (initialSession?.user) {
+        loadUserProfile(initialSession.user);
+      } else {
+        setLoading(false);
+      }
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setLoading(false);
+      if (session?.user) {
+        await loadUserProfile(session.user);
+      } else {
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const signUp = async (email: string, password: string) => {
+  const loadUserProfile = async (user: User) => {
+    try {
+      const userProfile = await getUserProfile(user.id);
+      setProfile(userProfile);
+    } catch (error) {
+      console.error('Error loading user profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signUp = async (email: string, password: string, username: string) => {
     const response = await supabase.auth.signUp({
       email,
       password,
@@ -44,7 +67,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         emailRedirectTo: window.location.origin
       }
     });
+
     if (response.error) throw response.error;
+
+    // Create user profile if sign up successful
+    if (response.data.user) {
+      try {
+        await createUserProfile({
+          id: response.data.user.id,
+          email,
+          username
+        });
+      } catch (error) {
+        // If profile creation fails, delete the auth user
+        await supabase.auth.admin.deleteUser(response.data.user.id);
+        throw new Error('Failed to create user profile');
+      }
+    }
+
     return response;
   };
 
@@ -56,6 +96,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) throw error;
     setSession(newSession);
     setUser(newSession?.user ?? null);
+    if (newSession?.user) {
+      await loadUserProfile(newSession.user);
+    }
   };
 
   const signOut = async () => {
@@ -66,6 +109,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       // Clear auth state
       setSession(null);
       setUser(null);
+      setProfile(null);
       
       // Clear any cached data
       localStorage.removeItem('supabase.auth.token');
@@ -81,6 +125,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const value = {
     user,
     session,
+    profile,
     loading,
     signUp,
     signIn,
