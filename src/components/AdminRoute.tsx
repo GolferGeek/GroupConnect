@@ -1,27 +1,36 @@
-import { Route, Redirect, RouteProps } from 'react-router-dom';
+import React from 'react';
+import { Route, RouteProps, Redirect } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
-interface AdminRouteProps extends Omit<RouteProps, 'component'> {
+interface AdminRouteProps extends RouteProps {
   children: React.ReactNode;
 }
 
 const AdminRoute: React.FC<AdminRouteProps> = ({ children, ...rest }) => {
-  const { user, profile, loading } = useAuth();
-
-  if (loading) return null;
+  const { user, profile } = useAuth();
 
   return (
     <Route
       {...rest}
       render={props =>
-        user && profile?.role_id === 'admin' ? (
+        user && profile?.role_id === 1 ? (
           children
         ) : user ? (
           // If user is logged in but not admin, redirect to home
-          <Redirect to="/home" />
+          <Redirect
+            to={{
+              pathname: "/home",
+              state: { from: props.location }
+            }}
+          />
         ) : (
           // If user is not logged in, redirect to login
-          <Redirect to="/login" />
+          <Redirect
+            to={{
+              pathname: "/login",
+              state: { from: props.location }
+            }}
+          />
         )
       }
     />

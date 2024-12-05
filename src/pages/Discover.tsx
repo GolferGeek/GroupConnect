@@ -43,7 +43,6 @@ import {
 import { useAuth } from '../contexts/AuthContext';
 import { getPublicGroups, getUserJoinRequests, PublicGroup, JoinRequest, requestToJoinGroup } from '../services/database';
 import AppHeader from '../components/AppHeader';
-import AppTabBar from '../components/AppTabBar';
 
 const Discover: React.FC = () => {
   const [groups, setGroups] = useState<PublicGroup[]>([]);
@@ -138,7 +137,7 @@ const Discover: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title="Discover Groups" />
+      <AppHeader title="Discover" />
       <IonContent>
         <IonRefresher slot="fixed" onIonRefresh={loadData}>
           <IonRefresherContent />
@@ -363,7 +362,6 @@ const Discover: React.FC = () => {
           </IonContent>
         </IonModal>
       </IonContent>
-      <AppTabBar />
     </IonPage>
   );
 };

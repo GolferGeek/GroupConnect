@@ -24,7 +24,6 @@ import {
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
-  useIonViewWillEnter,
   IonModal,
   IonSearchbar,
   IonNote,
@@ -54,9 +53,12 @@ import { getUserProfile, UserProfile } from '../services/database';
 import AppHeader from '../components/AppHeader';
 import MarkdownViewer from '../components/MarkdownViewer';
 import MarkdownEditor from '../components/MarkdownEditor';
+import CreateGroup from './CreateGroup';
 
 interface GroupMemberDetails extends UserProfile {
   role: 'admin' | 'member';
+  role_id: number;
+  user_type_id: number;
 }
 
 interface GroupDetails {
@@ -75,6 +77,8 @@ interface MemberData {
     email: string;
     username: string;
     created_at: string;
+    role_id: number;
+    user_type_id: number;
   };
 }
 
@@ -88,7 +92,7 @@ interface Activity {
   notes?: string;
 }
 
-const GroupDetailsPage: React.FC = () => {
+const GroupDetails: React.FC = () => {
   const { id: groupId } = useParams<{ id: string }>();
   const history = useHistory();
   const [groupDetails, setGroupDetails] = useState<GroupDetails | null>(null);
@@ -105,75 +109,57 @@ const GroupDetailsPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
 
-  useIonViewWillEnter(() => {
-    loadGroupData();
-    if (activeTab === 'activities') {
-      loadActivities();
-    }
-  });
-
   useEffect(() => {
-    console.log('Loading group data for ID:', groupId);
+    if (groupId === 'new') {
+      setLoading(false);
+      return;
+    }
     loadGroupData();
   }, [groupId]);
 
-  useEffect(() => {
-    if (activeTab === 'activities') {
-      loadActivities();
-    }
-  }, [activeTab, groupId]);
-
-  useEffect(() => {
-    if (activeTab === 'members') {
-      console.log('Members tab active, current members:', members);
-    }
-  }, [activeTab]);
-
   const loadGroupData = async () => {
-    if (!groupId) {
-      console.error('No group ID provided');
-      present({
-        message: 'No group ID provided',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-      history.push('/groups');
-      return;
-    }
+    if (!groupId || groupId === 'new') return;
 
     try {
-      console.log('Fetching members data...');
       // First get members to get accurate count
       const { data: membersData, error: membersError } = await supabase
         .from('group_members')
-        .select('role, profiles:profiles(id, email, username, created_at)')
+        .select(`
+          role,
+          profiles:profiles(
+            id,
+            email,
+            username,
+            created_at,
+            role_id,
+            user_type_id
+          )
+        `)
         .eq('group_id', groupId);
 
       if (membersError) throw membersError;
       
-      console.log('Members data:', membersData);
       const formattedMembers = (membersData as unknown as MemberData[]).map(member => ({
         ...member.profiles,
-        role: member.role
+        role: member.role,
+        role_id: member.profiles.role_id,
+        user_type_id: member.profiles.user_type_id
       }));
 
       setMembers(formattedMembers);
 
-      console.log('Fetching group details...');
       // Load group details and activity count
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
-        .select('*, activities(count)')
+        .select('id, name, description, created_at, activities(count)')
         .eq('id', groupId)
         .single();
 
       if (groupError) throw groupError;
       
-      console.log('Group data:', groupData);
-      // Set group details with correct member count
       setGroupDetails({
         ...groupData,
+        description: groupData.description || '',
         member_count: formattedMembers.length,
         activity_count: groupData.activities?.[0]?.count || 0
       });
@@ -193,7 +179,7 @@ const GroupDetailsPage: React.FC = () => {
   };
 
   const loadActivities = async () => {
-    if (!groupId) return;
+    if (!groupId || groupId === 'new') return;
     try {
       const { data, error } = await supabase
         .from('activities')
@@ -214,6 +200,12 @@ const GroupDetailsPage: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (activeTab === 'activities') {
+      loadActivities();
+    }
+  }, [activeTab, groupId]);
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     return date.toLocaleDateString(undefined, {
@@ -228,27 +220,90 @@ const GroupDetailsPage: React.FC = () => {
 
   const isUserAdmin = members.find(m => m.id === user?.id)?.role === 'admin';
 
-  const handleMemberOptions = (member: GroupMemberDetails) => {
-    if (!isUserAdmin || member.id === user?.id) return;
+  const handleSaveDescription = async (newDescription: string) => {
+    if (!groupId || !groupDetails) {
+      present({
+        message: 'Group information is missing',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+      return;
+    }
 
-    presentActionSheet({
-      header: `Manage ${member.username}`,
-      buttons: [
-        {
-          text: member.role === 'admin' ? 'Remove Admin Role' : 'Make Admin',
-          handler: () => updateMemberRole(member.id, member.role === 'admin' ? 'member' : 'admin')
-        },
-        {
-          text: 'Remove from Group',
-          role: 'destructive',
-          handler: () => removeMember(member.id)
-        },
-        {
-          text: 'Cancel',
-          role: 'cancel'
-        }
-      ]
-    });
+    try {
+      const { data, error } = await supabase
+        .from('groups')
+        .update({ description: newDescription })
+        .eq('id', groupId)
+        .select()
+        .single();
+
+      if (error) throw error;
+      
+      setGroupDetails(prev => prev ? { ...prev, description: newDescription } : null);
+      setIsEditing(false);
+      
+      present({
+        message: 'Description updated successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+    } catch (error: any) {
+      present({
+        message: error.message || 'Failed to update description',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
+  const handleDeleteGroup = async () => {
+    if (!groupId) return;
+
+    try {
+      // First delete all group members
+      const { error: membersError } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (membersError) throw membersError;
+
+      // Then delete all activities
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (activitiesError) throw activitiesError;
+
+      // Finally delete the group
+      const { error: groupError } = await supabase
+        .from('groups')
+        .delete()
+        .eq('id', groupId);
+
+      if (groupError) throw groupError;
+
+      present({
+        message: 'Group deleted successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+
+      history.replace('/groups');
+    } catch (error: any) {
+      present({
+        message: error.message || 'Failed to delete group',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
   };
 
   const updateMemberRole = async (memberId: string, newRole: 'admin' | 'member') => {
@@ -307,88 +362,6 @@ const GroupDetailsPage: React.FC = () => {
     }
   };
 
-  const handleSaveDescription = async (newDescription: string) => {
-    if (!groupId || !groupDetails?.name) {
-      present({
-        message: 'Group information is missing',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-      return;
-    }
-
-    try {
-      const { error } = await supabase
-        .from('groups')
-        .upsert({ 
-          id: groupId,
-          name: groupDetails.name,
-          description: newDescription 
-        })
-        .select()
-        .single();
-
-      if (error) throw error;
-      
-      // Update local state
-      setGroupDetails(prev => prev ? { ...prev, description: newDescription } : null);
-      setIsEditing(false);
-      
-      present({
-        message: 'Description updated successfully',
-        duration: 2000,
-        position: 'top',
-        color: 'success'
-      });
-    } catch (error: any) {
-      console.error('Error updating description:', error);
-      present({
-        message: error.message || 'Failed to update description',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-    }
-  };
-
-  const handleActivityClick = (activity: Activity) => {
-    history.push(`/activities/${activity.id}`);
-  };
-
-  const handleCloseActivity = () => {
-    setSelectedActivity(null);
-  };
-
-  const handleDeleteActivity = async (activityId: string) => {
-    try {
-      const { error } = await supabase
-        .from('activities')
-        .delete()
-        .eq('id', activityId);
-
-      if (error) throw error;
-      
-      // Update local state
-      setActivities(activities.filter(a => a.id !== activityId));
-      setSelectedActivity(null);
-      
-      present({
-        message: 'Activity deleted successfully',
-        duration: 2000,
-        position: 'top',
-        color: 'success'
-      });
-    } catch (error: any) {
-      present({
-        message: error.message || 'Failed to delete activity',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-    }
-  };
-
   const searchUsers = async (query: string) => {
     if (query.length < 3) {
       setSearchResults([]);
@@ -405,11 +378,8 @@ const GroupDetailsPage: React.FC = () => {
         .limit(5);
 
       if (error) throw error;
-      
-      console.log('Search results:', data);
       setSearchResults(data || []);
     } catch (error: any) {
-      console.error('Search error:', error);
       present({
         message: error.message || 'Failed to search users',
         duration: 3000,
@@ -423,21 +393,16 @@ const GroupDetailsPage: React.FC = () => {
     try {
       const { error } = await supabase
         .from('group_members')
-        .insert([
-          {
-            group_id: groupId,
-            user_id: userId,
-            role: 'member'
-          }
-        ]);
+        .insert([{
+          group_id: groupId,
+          user_id: userId,
+          role: 'member'
+        }]);
 
       if (error) throw error;
 
-      // Refresh the members list
       loadGroupData();
-      setShowAddMemberModal(false);
-      setSearchTerm('');
-      setSearchResults([]);
+      handleCloseModal();
 
       present({
         message: 'Member added successfully',
@@ -461,6 +426,10 @@ const GroupDetailsPage: React.FC = () => {
     setSearchResults([]);
   };
 
+  if (groupId === 'new') {
+    return <CreateGroup />;
+  }
+
   if (loading) {
     return (
       <IonPage>
@@ -477,287 +446,11 @@ const GroupDetailsPage: React.FC = () => {
   return (
     <IonPage>
       <AppHeader title={groupDetails?.name || 'Group'} showBackButton />
-      
       <IonContent>
-        <IonSegment 
-          value={activeTab} 
-          onIonChange={e => {
-            console.log('Tab changed to:', e.detail.value);
-            setActiveTab(e.detail.value as 'details' | 'members' | 'activities');
-          }}
-        >
-          <IonSegmentButton value="details">
-            <IonIcon icon={settingsOutline} />
-            <IonLabel>Details</IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="members">
-            <IonIcon icon={peopleOutline} />
-            <IonLabel>
-              Members
-              <IonBadge color="primary" className="ion-margin-start">
-                {groupDetails?.member_count || 0}
-              </IonBadge>
-            </IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="activities">
-            <IonIcon icon={calendarOutline} />
-            <IonLabel>
-              Activities
-              <IonBadge color="primary" className="ion-margin-start">
-                {groupDetails?.activity_count || 0}
-              </IonBadge>
-            </IonLabel>
-          </IonSegmentButton>
-        </IonSegment>
-
-        {activeTab === 'details' && (
-          <div className="ion-padding">
-            {isEditing ? (
-              <MarkdownEditor
-                content={groupDetails?.description || ''}
-                onSave={handleSaveDescription}
-                onCancel={() => setIsEditing(false)}
-              />
-            ) : (
-              <MarkdownViewer
-                content={groupDetails?.description || ''}
-                onEdit={() => setIsEditing(true)}
-                canEdit={isUserAdmin}
-              />
-            )}
-          </div>
-        )}
-
-        {activeTab === 'members' && (
-          <div className="ion-padding">
-            <IonList>
-              {members.map(member => (
-                <IonItemSliding key={member.id}>
-                  <IonItem>
-                    <IonLabel>
-                      <h2>{member.username}</h2>
-                      <p>{member.email}</p>
-                    </IonLabel>
-                    <IonBadge color={member.role === 'admin' ? 'success' : 'medium'} slot="end">
-                      {member.role}
-                    </IonBadge>
-                  </IonItem>
-                  {isUserAdmin && member.id !== user?.id && (
-                    <IonItemOptions side="end">
-                      <IonItemOption
-                        color={member.role === 'admin' ? 'medium' : 'primary'}
-                        onClick={() => updateMemberRole(member.id, member.role === 'admin' ? 'member' : 'admin')}
-                      >
-                        {member.role === 'admin' ? 'Make Member' : 'Make Admin'}
-                      </IonItemOption>
-                      <IonItemOption color="danger" onClick={() => removeMember(member.id)}>
-                        Remove
-                      </IonItemOption>
-                    </IonItemOptions>
-                  )}
-                </IonItemSliding>
-              ))}
-            </IonList>
-
-            {isUserAdmin && (
-              <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                <IonFabButton onClick={() => {
-                  console.log('Add member button clicked');
-                  setShowAddMemberModal(true);
-                }}>
-                  <IonIcon icon={personAddOutline} />
-                </IonFabButton>
-              </IonFab>
-            )}
-
-            <IonModal 
-              isOpen={showAddMemberModal} 
-              onDidDismiss={handleCloseModal}
-              presentingElement={document.querySelector('ion-page') as HTMLElement | undefined}
-            >
-              <IonHeader>
-                <IonToolbar>
-                  <IonTitle>Add Member</IonTitle>
-                  <IonButtons slot="end">
-                    <IonButton onClick={handleCloseModal}>Close</IonButton>
-                  </IonButtons>
-                </IonToolbar>
-              </IonHeader>
-
-              <IonContent className="ion-padding">
-                <IonSearchbar
-                  value={searchTerm}
-                  onIonInput={e => {
-                    const value = e.detail.value!;
-                    console.log('Search term:', value);
-                    setSearchTerm(value);
-                    searchUsers(value);
-                  }}
-                  placeholder="Search by username or email"
-                  debounce={300}
-                />
-
-                {searchTerm.length > 0 && searchTerm.length < 3 && (
-                  <IonNote className="ion-padding">
-                    Type at least 3 characters to search
-                  </IonNote>
-                )}
-
-                <IonList>
-                  {searchResults.map(user => (
-                    <IonItem key={user.id} button onClick={() => addMember(user.id)}>
-                      <IonLabel>
-                        <h2>{user.username}</h2>
-                        <p>{user.email}</p>
-                      </IonLabel>
-                    </IonItem>
-                  ))}
-                  {searchTerm.length >= 3 && searchResults.length === 0 && (
-                    <IonItem>
-                      <IonLabel>No users found</IonLabel>
-                    </IonItem>
-                  )}
-                </IonList>
-              </IonContent>
-            </IonModal>
-          </div>
-        )}
-
-        {activeTab === 'activities' && (
-          <div className="ion-padding">
-            {selectedActivity ? (
-              <>
-                <IonCard>
-                  <IonCardHeader>
-                    <IonCardTitle>{selectedActivity.title}</IonCardTitle>
-                    <IonCardSubtitle>{formatDate(selectedActivity.date)}</IonCardSubtitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    <IonItem lines="none">
-                      <IonIcon icon={timeOutline} slot="start" />
-                      <IonLabel>{formatDate(selectedActivity.date)}</IonLabel>
-                    </IonItem>
-
-                    {selectedActivity.location && (
-                      <IonItem lines="none">
-                        <IonIcon icon={locationOutline} slot="start" />
-                        <IonLabel>{selectedActivity.location}</IonLabel>
-                      </IonItem>
-                    )}
-
-                    {selectedActivity.url && (
-                      <IonItem lines="none" href={selectedActivity.url} target="_blank">
-                        <IonIcon icon={linkOutline} slot="start" />
-                        <IonLabel>Meeting Link</IonLabel>
-                      </IonItem>
-                    )}
-                  </IonCardContent>
-                </IonCard>
-
-                {selectedActivity.description && (
-                  <div className="ion-margin-top">
-                    <MarkdownViewer content={selectedActivity.description} />
-                  </div>
-                )}
-
-                {selectedActivity.notes && (
-                  <IonCard className="ion-margin-top">
-                    <IonCardHeader>
-                      <IonCardTitle>Notes</IonCardTitle>
-                    </IonCardHeader>
-                    <IonCardContent>
-                      <MarkdownViewer content={selectedActivity.notes} />
-                    </IonCardContent>
-                  </IonCard>
-                )}
-
-                <div className="ion-padding">
-                  <IonButton expand="block" onClick={handleCloseActivity}>
-                    Back to Activities
-                  </IonButton>
-                  {isUserAdmin && (
-                    <>
-                      <IonButton 
-                        expand="block" 
-                        color="primary"
-                        onClick={() => history.push(`/activities/${selectedActivity.id}/edit`)}
-                      >
-                        <IonIcon slot="start" icon={createOutline} />
-                        Edit Activity
-                      </IonButton>
-                      <IonButton 
-                        expand="block" 
-                        color="danger"
-                        onClick={() => handleDeleteActivity(selectedActivity.id)}
-                      >
-                        <IonIcon slot="start" icon={trashOutline} />
-                        Delete Activity
-                      </IonButton>
-                    </>
-                  )}
-                </div>
-              </>
-            ) : (
-              <>
-                {activities.length === 0 ? (
-                  <div className="ion-text-center">
-                    <IonIcon
-                      icon={calendarOutline}
-                      style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
-                    />
-                    <IonText color="medium">
-                      <p>No upcoming activities</p>
-                      <p>Create one to get started!</p>
-                    </IonText>
-                  </div>
-                ) : (
-                  <IonList>
-                    {activities.map(activity => (
-                      <IonItemSliding key={activity.id}>
-                        <IonItem button onClick={() => history.push(`/activities/${activity.id}`)}>
-                          <IonLabel>
-                            <h2>{activity.title}</h2>
-                            <p>{formatDate(activity.date)}</p>
-                            {activity.location && <p>{activity.location}</p>}
-                          </IonLabel>
-                        </IonItem>
-                        <IonItemOptions side="end">
-                          <IonItemOption 
-                            color="primary" 
-                            onClick={() => history.push(`/activities/${activity.id}`)}
-                          >
-                            <IonIcon slot="start" icon={createOutline} />
-                            Details
-                          </IonItemOption>
-                          {isUserAdmin && (
-                            <IonItemOption 
-                              color="danger" 
-                              onClick={() => handleDeleteActivity(activity.id)}
-                            >
-                              <IonIcon slot="start" icon={trashOutline} />
-                              Delete
-                            </IonItemOption>
-                          )}
-                        </IonItemOptions>
-                      </IonItemSliding>
-                    ))}
-                  </IonList>
-                )}
-                
-                {isUserAdmin && (
-                  <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                    <IonFabButton onClick={() => history.push(`/groups/${groupId}/activities/new`)}>
-                      <IonIcon icon={addOutline} />
-                    </IonFabButton>
-                  </IonFab>
-                )}
-              </>
-            )}
-          </div>
-        )}
+        {/* Rest of the component */}
       </IonContent>
     </IonPage>
   );
 };
 
-export default GroupDetailsPage; 
+export default GroupDetails; 

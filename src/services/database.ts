@@ -32,12 +32,12 @@ export interface GroupMember {
 
 export interface UserProfile {
   id: string;
-  email: string;
   username: string;
-  role_id: string;
+  email: string;
+  created_at: string;
+  role_id: number;
   user_type_id: number;
   other_types?: number[];
-  created_at?: string;
 }
 
 export interface PublicGroup {
@@ -77,7 +77,7 @@ export const createUserProfile = async (userData: Omit<UserProfile, 'created_at'
     .from('profiles')
     .insert([{
       ...userData,
-      role_id: userData.role_id || 'member',  // default role
+      role_id: userData.role_id || 2,  // default role is member (2)
       user_type_id: userData.user_type_id,
       other_types: userData.other_types || []
     }]);
@@ -138,13 +138,15 @@ export const getUserRoles = async () => {
 export const createGroup = async (
   name: string, 
   userId: string, 
+  group_type_id: number,
   visibility: 'public' | 'private' = 'private',
   join_method: 'direct' | 'invitation' = 'invitation'
 ) => {
   const { data: group, error: groupError } = await supabase
     .from('groups')
     .insert([{ 
-      name, 
+      name,
+      group_type_id,
       ...(visibility && { visibility }),
       ...(join_method && { join_method })
     }])

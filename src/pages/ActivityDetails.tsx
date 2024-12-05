@@ -196,10 +196,7 @@ const ActivityDetails: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader 
-        title={activity?.title || 'Activity'} 
-        showBackButton 
-      />
+      <AppHeader title={activity?.title || 'Activity'} showBackButton />
       <IonContent>
         <IonCard>
           <IonCardHeader>

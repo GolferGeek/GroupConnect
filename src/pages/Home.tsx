@@ -10,7 +10,6 @@ import { personCircleOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
 import { getUserProfile, UserProfile } from '../services/database';
 import AppHeader from '../components/AppHeader';
-import AppTabBar from '../components/AppTabBar';
 import './Home.css';
 
 const Home: React.FC = () => {
@@ -59,7 +58,6 @@ const Home: React.FC = () => {
           </p>
         </div>
       </IonContent>
-      <AppTabBar />
     </IonPage>
   );
 };

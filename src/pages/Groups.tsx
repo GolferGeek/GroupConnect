@@ -7,209 +7,98 @@ import {
   IonLabel,
   IonButton,
   IonIcon,
-  IonFab,
-  IonFabButton,
-  IonModal,
-  IonInput,
-  IonButtons,
-  useIonToast,
   IonSpinner,
   IonText,
-  IonToolbar,
-  IonTitle,
-  IonHeader,
-  IonSelect,
-  IonSelectOption,
   IonBadge,
+  IonFab,
+  IonFabButton,
+  useIonToast,
   IonItemSliding,
   IonItemOptions,
   IonItemOption,
+  useIonActionSheet,
+  useIonViewWillEnter,
 } from '@ionic/react';
-import { addOutline, peopleOutline, lockClosedOutline, globeOutline, settingsOutline } from 'ionicons/icons';
-import { useAuth } from '../contexts/AuthContext';
-import { createGroup, getUserGroups, Group, updateGroupSettings } from '../services/database';
+import { addOutline, peopleOutline, trashOutline } from 'ionicons/icons';
 import { useHistory } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../config/supabase';
 import AppHeader from '../components/AppHeader';
-import AppTabBar from '../components/AppTabBar';
 
-interface GroupSettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
-  group: Group;
-  onUpdate: () => void;
+interface ExtendedGroup {
+  id: string;
+  name: string;
+  description?: string;
+  visibility?: 'public' | 'private';
+  created_at: string;
+  member_count: number;
+  activity_count: number;
+  role: 'admin' | 'member';
 }
 
-const GroupSettingsModal: React.FC<GroupSettingsModalProps> = ({
-  isOpen,
-  onClose,
-  group,
-  onUpdate,
-}) => {
-  const [name, setName] = useState(group.name);
-  const [visibility, setVisibility] = useState<'public' | 'private'>(group.visibility || 'private');
-  const [joinMethod, setJoinMethod] = useState<'direct' | 'invitation'>(group.join_method || 'invitation');
-  const [updating, setUpdating] = useState(false);
-  const [present] = useIonToast();
-
-  const handleUpdate = async () => {
-    setUpdating(true);
-    try {
-      const updates: {
-        name?: string;
-        visibility?: 'public' | 'private';
-        join_method?: 'direct' | 'invitation';
-      } = {};
-
-      if (name !== group.name) {
-        updates.name = name;
-      }
-
-      if (visibility !== group.visibility) {
-        updates.visibility = visibility;
-        if (visibility === 'private') {
-          updates.join_method = 'invitation';
-          setJoinMethod('invitation');
-        }
-      }
-
-      if (joinMethod !== group.join_method && visibility === 'public') {
-        updates.join_method = joinMethod;
-      }
-
-      if (Object.keys(updates).length > 0) {
-        await updateGroupSettings(group.id, updates);
-      }
-
-      onUpdate();
-      onClose();
-      present({
-        message: 'Group settings updated successfully',
-        duration: 2000,
-        position: 'top',
-        color: 'success'
-      });
-    } catch (error: any) {
-      present({
-        message: error.message || 'Failed to update group settings',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  return (
-    <IonModal isOpen={isOpen} onDidDismiss={onClose}>
-      <IonHeader>
-        <IonToolbar>
-          <IonTitle>Group Settings</IonTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={onClose}>Cancel</IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent>
-        <IonList>
-          <IonItem>
-            <IonLabel position="stacked">Group Name</IonLabel>
-            <IonInput
-              value={name}
-              onIonChange={e => setName(e.detail.value!)}
-              placeholder="Enter group name"
-            />
-          </IonItem>
-
-          <IonItem>
-            <IonLabel position="stacked">Visibility</IonLabel>
-            <IonSelect
-              value={visibility}
-              onIonChange={e => {
-                setVisibility(e.detail.value);
-                if (e.detail.value === 'private') {
-                  setJoinMethod('invitation');
-                }
-              }}
-            >
-              <IonSelectOption value="private">
-                Private - Only visible to members
-              </IonSelectOption>
-              <IonSelectOption value="public">
-                Public - Anyone can find this group
-              </IonSelectOption>
-            </IonSelect>
-          </IonItem>
-
-          {visibility === 'public' && (
-            <IonItem>
-              <IonLabel position="stacked">Join Method</IonLabel>
-              <IonSelect
-                value={joinMethod}
-                onIonChange={e => setJoinMethod(e.detail.value)}
-              >
-                <IonSelectOption value="direct">
-                  Direct - Anyone can join instantly
-                </IonSelectOption>
-                <IonSelectOption value="invitation">
-                  By Invitation - Requires admin approval
-                </IonSelectOption>
-              </IonSelect>
-            </IonItem>
-          )}
-        </IonList>
-
-        <div className="ion-padding">
-          <IonText color="medium">
-            <p>
-              {visibility === 'private' 
-                ? 'Private groups are only visible to members'
-                : joinMethod === 'direct'
-                  ? 'Anyone can find and instantly join this group'
-                  : 'Anyone can find this group but must request to join'}
-            </p>
-          </IonText>
-        </div>
-
-        <div className="ion-padding">
-          <IonButton
-            expand="block"
-            onClick={handleUpdate}
-            disabled={updating}
-          >
-            {updating ? <IonSpinner name="crescent" /> : 'Update Settings'}
-          </IonButton>
-        </div>
-      </IonContent>
-    </IonModal>
-  );
-};
-
 const Groups: React.FC = () => {
-  const [groups, setGroups] = useState<Group[]>([]);
+  const [groups, setGroups] = useState<ExtendedGroup[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
-  const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupVisibility, setNewGroupVisibility] = useState<'public' | 'private'>('private');
-  const [newGroupJoinMethod, setNewGroupJoinMethod] = useState<'direct' | 'invitation'>('invitation');
-  const [creating, setCreating] = useState(false);
   const { user } = useAuth();
   const history = useHistory();
   const [present] = useIonToast();
+  const [presentActionSheet] = useIonActionSheet();
 
   useEffect(() => {
     loadGroups();
   }, [user]);
 
+  // Refresh data when the page becomes active
+  useIonViewWillEnter(() => {
+    console.log('Groups page will enter, refreshing data...');
+    loadGroups();
+  });
+
   const loadGroups = async () => {
     if (!user) return;
+
     try {
-      const userGroups = await getUserGroups(user.id);
-      setGroups(userGroups);
-    } catch (error) {
+      console.log('Loading groups...');
+      // Get groups with member count and activity count
+      const { data: groupsData, error: groupsError } = await supabase
+        .from('groups')
+        .select(`
+          *,
+          group_members!inner(role),
+          activities(count)
+        `)
+        .eq('group_members.user_id', user.id);
+
+      if (groupsError) throw groupsError;
+
+      console.log('Groups data:', groupsData);
+
+      // Format the data
+      const formattedGroups = groupsData?.map(group => ({
+        ...group,
+        role: group.group_members[0].role,
+        member_count: 0, // Will be updated below
+        activity_count: group.activities?.[0]?.count || 0
+      })) || [];
+
+      // Get member counts for each group
+      for (const group of formattedGroups) {
+        const { count, error: countError } = await supabase
+          .from('group_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('group_id', group.id);
+
+        if (!countError) {
+          group.member_count = count || 0;
+        }
+      }
+
+      console.log('Formatted groups:', formattedGroups);
+      setGroups(formattedGroups);
+    } catch (error: any) {
+      console.error('Error loading groups:', error);
       present({
-        message: 'Failed to load groups',
+        message: error.message || 'Failed to load groups',
         duration: 3000,
         position: 'top',
         color: 'danger'
@@ -219,52 +108,55 @@ const Groups: React.FC = () => {
     }
   };
 
-  const handleCreateGroup = async () => {
-    if (!user || !newGroupName.trim()) return;
-    setCreating(true);
+  const handleDeleteGroup = async (groupId: string) => {
     try {
-      console.log('Creating new group...');
-      const group = await createGroup(
-        newGroupName.trim(), 
-        user.id, 
-        newGroupVisibility,
-        newGroupJoinMethod
-      );
-      console.log('Created group:', group);
-      setGroups([...groups, group]);
-      setIsModalOpen(false);
-      setNewGroupName('');
-      setNewGroupVisibility('private');
-      setNewGroupJoinMethod('invitation');
-      console.log('Navigating to group details:', `/groups/${group.id}`);
-      history.push(`/groups/${group.id}`);
-    } catch (error) {
-      console.error('Error creating group:', error);
+      // First delete all group members
+      const { error: membersError } = await supabase
+        .from('group_members')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (membersError) throw membersError;
+
+      // Then delete all activities
+      const { error: activitiesError } = await supabase
+        .from('activities')
+        .delete()
+        .eq('group_id', groupId);
+
+      if (activitiesError) throw activitiesError;
+
+      // Finally delete the group
+      const { error: groupError } = await supabase
+        .from('groups')
+        .delete()
+        .eq('id', groupId);
+
+      if (groupError) throw groupError;
+
+      // Update local state
+      setGroups(groups.filter(g => g.id !== groupId));
+
       present({
-        message: 'Failed to create group',
+        message: 'Group deleted successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+    } catch (error: any) {
+      console.error('Error deleting group:', error);
+      present({
+        message: error.message || 'Failed to delete group',
         duration: 3000,
         position: 'top',
         color: 'danger'
       });
-    } finally {
-      setCreating(false);
     }
-  };
-
-  const closeModal = () => {
-    setIsModalOpen(false);
-    setNewGroupName('');
-    setNewGroupVisibility('private');
-    setNewGroupJoinMethod('invitation');
-  };
-
-  const handleGroupSettings = (group: Group) => {
-    setSelectedGroup(group);
   };
 
   return (
     <IonPage>
-      <AppHeader title="My Groups" />
+      <AppHeader title="Groups" />
       <IonContent>
         {loading ? (
           <div className="ion-text-center ion-padding">
@@ -276,8 +168,8 @@ const Groups: React.FC = () => {
               icon={peopleOutline}
               style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
             />
-            <IonText>
-              <p>You haven't joined any groups yet.</p>
+            <IonText color="medium">
+              <p>No groups found</p>
               <p>Create one to get started!</p>
             </IonText>
           </div>
@@ -285,133 +177,55 @@ const Groups: React.FC = () => {
           <IonList>
             {groups.map(group => (
               <IonItemSliding key={group.id}>
-                <IonItem>
-                  <IonLabel onClick={() => history.push(`/groups/${group.id}`)}>
+                <IonItem button onClick={() => history.push(`/groups/${group.id}`)}>
+                  <IonLabel>
                     <h2>{group.name}</h2>
+                    <p>
+                      {group.member_count} member{group.member_count !== 1 ? 's' : ''}
+                      {group.activity_count > 0 && ` • ${group.activity_count} activities`}
+                    </p>
                   </IonLabel>
-                  <IonBadge 
-                    color={(group.visibility || 'private') === 'private' ? 'medium' : 'success'} 
-                    slot="end"
-                  >
-                    <IonIcon 
-                      icon={(group.visibility || 'private') === 'private' ? lockClosedOutline : globeOutline} 
-                    />
-                    &nbsp;
-                    {group.visibility || 'private'}
-                  </IonBadge>
+                  {group.role === 'admin' && (
+                    <IonBadge color="success" slot="end">Admin</IonBadge>
+                  )}
                 </IonItem>
-                <IonItemOptions side="end">
-                  <IonItemOption color="primary" onClick={() => handleGroupSettings(group)}>
-                    <IonIcon slot="start" icon={settingsOutline} />
-                    Settings
-                  </IonItemOption>
-                </IonItemOptions>
+                {group.role === 'admin' && (
+                  <IonItemOptions side="end">
+                    <IonItemOption 
+                      color="danger" 
+                      onClick={() => {
+                        presentActionSheet({
+                          header: 'Delete Group',
+                          subHeader: 'This action cannot be undone',
+                          buttons: [
+                            {
+                              text: 'Delete',
+                              role: 'destructive',
+                              handler: () => handleDeleteGroup(group.id)
+                            },
+                            {
+                              text: 'Cancel',
+                              role: 'cancel'
+                            }
+                          ]
+                        });
+                      }}
+                    >
+                      <IonIcon slot="icon-only" icon={trashOutline} />
+                    </IonItemOption>
+                  </IonItemOptions>
+                )}
               </IonItemSliding>
             ))}
           </IonList>
         )}
 
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={() => setIsModalOpen(true)}>
+          <IonFabButton onClick={() => history.push('/groups/new')}>
             <IonIcon icon={addOutline} />
           </IonFabButton>
         </IonFab>
-
-        <IonModal isOpen={isModalOpen} onDidDismiss={closeModal}>
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>Create New Group</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={closeModal}>Cancel</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
-          <IonContent className="ion-padding">
-            <IonItem>
-              <IonLabel position="stacked">Group Name</IonLabel>
-              <IonInput
-                value={newGroupName}
-                onIonChange={e => setNewGroupName(e.detail.value!)}
-                placeholder="Enter group name"
-                disabled={creating}
-              />
-            </IonItem>
-
-            <IonItem className="ion-margin-top">
-              <IonLabel position="stacked">Visibility</IonLabel>
-              <IonSelect
-                value={newGroupVisibility}
-                onIonChange={e => {
-                  setNewGroupVisibility(e.detail.value);
-                  if (e.detail.value === 'private') {
-                    setNewGroupJoinMethod('invitation');
-                  }
-                }}
-                disabled={creating}
-              >
-                <IonSelectOption value="private">
-                  <IonIcon icon={lockClosedOutline} /> Private - Only visible to members
-                </IonSelectOption>
-                <IonSelectOption value="public">
-                  <IonIcon icon={globeOutline} /> Public - Anyone can find this group
-                </IonSelectOption>
-              </IonSelect>
-            </IonItem>
-
-            {newGroupVisibility === 'public' && (
-              <IonItem className="ion-margin-top">
-                <IonLabel position="stacked">Join Method</IonLabel>
-                <IonSelect
-                  value={newGroupJoinMethod}
-                  onIonChange={e => setNewGroupJoinMethod(e.detail.value)}
-                  disabled={creating}
-                >
-                  <IonSelectOption value="direct">
-                    Direct - Anyone can join instantly
-                  </IonSelectOption>
-                  <IonSelectOption value="invitation">
-                    By Invitation - Requires admin approval
-                  </IonSelectOption>
-                </IonSelect>
-              </IonItem>
-            )}
-
-            <div className="ion-margin-top">
-              <IonText color="medium">
-                <p>
-                  {newGroupVisibility === 'private' 
-                    ? 'Private groups are only visible to members'
-                    : newGroupJoinMethod === 'direct'
-                      ? 'Anyone can find and instantly join this group'
-                      : 'Anyone can find this group but must request to join'}
-                </p>
-              </IonText>
-            </div>
-
-            <IonButton
-              expand="block"
-              onClick={handleCreateGroup}
-              className="ion-margin-top"
-              disabled={!newGroupName.trim() || creating}
-            >
-              {creating ? <IonSpinner name="crescent" /> : 'Create Group'}
-            </IonButton>
-          </IonContent>
-        </IonModal>
-
-        {selectedGroup && (
-          <GroupSettingsModal
-            isOpen={!!selectedGroup}
-            onClose={() => setSelectedGroup(null)}
-            group={selectedGroup}
-            onUpdate={() => {
-              loadGroups();
-              setSelectedGroup(null);
-            }}
-          />
-        )}
       </IonContent>
-      <AppTabBar />
     </IonPage>
   );
 };

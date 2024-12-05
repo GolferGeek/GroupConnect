@@ -1,16 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
-  IonCard,
-  IonCardContent,
   IonTextarea,
   IonButton,
-  IonButtons,
   IonIcon,
-  IonCardHeader,
-  IonCardTitle,
-  IonToolbar,
+  IonText,
 } from '@ionic/react';
-import { checkmarkOutline, closeOutline } from 'ionicons/icons';
+import { saveOutline, closeOutline } from 'ionicons/icons';
 
 interface MarkdownEditorProps {
   content: string;
@@ -18,45 +13,43 @@ interface MarkdownEditorProps {
   onCancel: () => void;
 }
 
-const MarkdownEditor: React.FC<MarkdownEditorProps> = ({
-  content,
-  onSave,
-  onCancel,
-}) => {
-  const [value, setValue] = useState(content);
+const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onSave, onCancel }) => {
+  const [value, setValue] = useState(content || '');
+
+  useEffect(() => {
+    console.log('MarkdownEditor content prop changed:', content);
+    setValue(content || '');
+  }, [content]);
+
+  const handleSave = () => {
+    console.log('MarkdownEditor saving value:', value);
+    onSave(value || '');
+  };
 
   return (
-    <IonCard>
-      <IonCardHeader>
-        <IonToolbar>
-          <IonCardTitle>Edit Description</IonCardTitle>
-          <IonButtons slot="end">
-            <IonButton onClick={() => onSave(value)} color="success">
-              <IonIcon slot="start" icon={checkmarkOutline} />
-              Save
-            </IonButton>
-            <IonButton onClick={onCancel} color="medium">
-              <IonIcon slot="start" icon={closeOutline} />
-              Cancel
-            </IonButton>
-          </IonButtons>
-        </IonToolbar>
-      </IonCardHeader>
-      <IonCardContent>
-        <IonTextarea
-          value={value}
-          onIonChange={e => setValue(e.detail.value!)}
-          rows={10}
-          placeholder="Enter markdown content..."
-          className="ion-margin-bottom"
-        />
-        <div className="ion-padding-top ion-text-end">
-          <IonButton fill="clear" size="small" color="medium">
-            Markdown supported
-          </IonButton>
-        </div>
-      </IonCardContent>
-    </IonCard>
+    <div>
+      <IonTextarea
+        value={value}
+        onIonChange={e => {
+          const newValue = e.detail.value || '';
+          console.log('MarkdownEditor text changed:', newValue);
+          setValue(newValue);
+        }}
+        placeholder="Enter description (supports Markdown)"
+        rows={10}
+        className="ion-margin-bottom"
+      />
+      <div className="ion-text-end">
+        <IonButton fill="clear" onClick={onCancel}>
+          <IonIcon slot="start" icon={closeOutline} />
+          Cancel
+        </IonButton>
+        <IonButton onClick={handleSave}>
+          <IonIcon slot="start" icon={saveOutline} />
+          Save
+        </IonButton>
+      </div>
+    </div>
   );
 };
 

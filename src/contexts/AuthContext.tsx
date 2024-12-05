@@ -9,7 +9,7 @@ type AuthContextType = {
   profile: UserProfile | null;
   loading: boolean;
   signUp: (email: string, password: string, username: string) => Promise<AuthResponse>;
-  signIn: (email: string, password: string) => Promise<void>;
+  signIn: (email: string, password: string) => Promise<AuthResponse>;
   signOut: () => Promise<void>;
 };
 
@@ -60,44 +60,65 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUp = async (email: string, password: string, username: string) => {
-    const response = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: window.location.origin
-      }
-    });
+    try {
+      const { data: roleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('id')
+        .eq('name', 'member')
+        .single();
 
-    if (response.error) throw response.error;
+      if (roleError) throw roleError;
 
-    // Create user profile if sign up successful
-    if (response.data.user) {
-      try {
+      const { data: typeData, error: typeError } = await supabase
+        .from('user_types')
+        .select('id')
+        .eq('type', 'General')
+        .single();
+
+      if (typeError) throw typeError;
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+
+      if (data?.user) {
         await createUserProfile({
-          id: response.data.user.id,
+          id: data.user.id,
           email,
-          username
+          username,
+          role_id: roleData.id,
+          user_type_id: typeData.id
         });
-      } catch (error) {
-        // If profile creation fails, delete the auth user
-        await supabase.auth.admin.deleteUser(response.data.user.id);
-        throw new Error('Failed to create user profile');
       }
-    }
 
-    return response;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error signing up:', error);
+      return {
+        data: { user: null, session: null },
+        error
+      };
+    }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error, data: { session: newSession } } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    if (error) throw error;
-    setSession(newSession);
-    setUser(newSession?.user ?? null);
-    if (newSession?.user) {
-      await loadUserProfile(newSession.user);
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: any) {
+      console.error('Error signing in:', error);
+      return {
+        data: { user: null, session: null },
+        error
+      };
     }
   };
 

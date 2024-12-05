@@ -155,7 +155,7 @@ const Profile: React.FC = () => {
           <IonItem>
             <IonLabel>
               <h2>Role</h2>
-              <p>{profile.role_id}</p>
+              <p>{profile.role_id === 1 ? 'Admin' : 'Member'}</p>
             </IonLabel>
           </IonItem>
 
@@ -170,12 +170,12 @@ const Profile: React.FC = () => {
                 >
                   {userTypes.map(type => (
                     <IonSelectOption key={type.id} value={type.id}>
-                      {type.type} - {type.description}
+                      {type.type}
                     </IonSelectOption>
                   ))}
                 </IonSelect>
               ) : (
-                <p>{currentType ? `${currentType.type} - ${currentType.description}` : 'Not set'}</p>
+                <p>{currentType ? currentType.type : 'Not set'}</p>
               )}
             </IonLabel>
           </IonItem>
@@ -194,7 +194,7 @@ const Profile: React.FC = () => {
                     .filter(type => type.id !== selectedType)
                     .map(type => (
                       <IonSelectOption key={type.id} value={type.id}>
-                        {type.type} - {type.description}
+                        {type.type}
                       </IonSelectOption>
                     ))}
                 </IonSelect>
@@ -223,7 +223,7 @@ const Profile: React.FC = () => {
           </div>
         )}
 
-        {profile?.role_id === 'admin' && (
+        {profile?.role_id === 1 && (
           <div className="ion-padding">
             <IonButton expand="block" color="tertiary" routerLink="/type-manager">
               Manage User Types

@@ -1,67 +1,57 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import {
   IonContent,
   IonPage,
+  IonItem,
+  IonLabel,
   IonInput,
   IonButton,
+  IonText,
+  IonSpinner,
   IonSegment,
   IonSegmentButton,
-  IonCard,
-  IonCardContent,
   useIonToast,
 } from '@ionic/react';
 import { useAuth } from '../contexts/AuthContext';
-import { createUserProfile } from '../services/database';
 import { useHistory } from 'react-router-dom';
 
-interface SignUpData {
-  email: string;
-  username: string;
-  id: string;
-}
-
 const Login: React.FC = () => {
-  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
   const { signIn, signUp } = useAuth();
   const history = useHistory();
   const [present] = useIonToast();
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError('');
     setLoading(true);
 
     try {
-      if (mode === 'login') {
-        await signIn(email, password);
+      if (mode === 'signup') {
+        if (!username.trim()) {
+          throw new Error('Username is required');
+        }
+        const response = await signUp(email, password, username);
+        if (response.error) {
+          throw response.error;
+        }
         history.push('/home');
       } else {
-        const { data: { user } } = await signUp(email, password);
-        if (user) {
-          const userData: SignUpData = {
-            id: user.id,
-            email: user.email || '',
-            username
-          };
-          await createUserProfile(userData);
-          present({
-            message: 'Check your email for verification link',
-            duration: 3000,
-            position: 'top',
-            color: 'success'
-          });
+        const { data, error } = await signIn(email, password);
+        if (error) {
+          throw error;
+        }
+        if (data?.user) {
+          history.push('/home');
         }
       }
     } catch (error: any) {
-      present({
-        message: error?.message || 'An error occurred',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
+      setError(error.message);
     } finally {
       setLoading(false);
     }
@@ -71,61 +61,79 @@ const Login: React.FC = () => {
     <IonPage>
       <IonContent className="ion-padding">
         <div style={{ maxWidth: '400px', margin: '0 auto', paddingTop: '2rem' }}>
-          <IonCard>
-            <IonCardContent>
-              <h1 style={{ textAlign: 'center', marginBottom: '2rem' }}>GroupConnect</h1>
-              
-              <IonSegment value={mode} onIonChange={e => setMode(e.detail.value as 'login' | 'signup')}>
-                <IonSegmentButton value="login">Login</IonSegmentButton>
-                <IonSegmentButton value="signup">Sign Up</IonSegmentButton>
-              </IonSegment>
+          <h1 className="ion-text-center">GroupConnect</h1>
+          
+          <IonSegment 
+            value={mode} 
+            onIonChange={e => setMode(e.detail.value as 'login' | 'signup')}
+            className="ion-margin-bottom"
+          >
+            <IonSegmentButton value="login">
+              <IonLabel>Login</IonLabel>
+            </IonSegmentButton>
+            <IonSegmentButton value="signup">
+              <IonLabel>Sign Up</IonLabel>
+            </IonSegmentButton>
+          </IonSegment>
 
-              <form onSubmit={handleSubmit} style={{ marginTop: '2rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                  {mode === 'signup' && (
-                    <IonInput
-                      label="Username"
-                      labelPlacement="floating"
-                      fill="solid"
-                      type="text"
-                      value={username}
-                      onIonInput={e => setUsername(e.detail.value!)}
-                      required
-                    />
-                  )}
+          <form onSubmit={handleSubmit}>
+            {mode === 'signup' && (
+              <IonItem>
+                <IonLabel position="stacked">Username</IonLabel>
+                <IonInput
+                  value={username}
+                  onIonChange={e => setUsername(e.detail.value!)}
+                  placeholder="Enter username"
+                  required
+                />
+              </IonItem>
+            )}
 
-                  <IonInput
-                    label="Email"
-                    labelPlacement="floating"
-                    fill="solid"
-                    type="email"
-                    value={email}
-                    onIonInput={e => setEmail(e.detail.value!)}
-                    required
-                  />
+            <IonItem>
+              <IonLabel position="stacked">Email</IonLabel>
+              <IonInput
+                type="email"
+                value={email}
+                onIonChange={e => setEmail(e.detail.value!)}
+                placeholder="Enter email"
+                required
+              />
+            </IonItem>
 
-                  <IonInput
-                    label="Password"
-                    labelPlacement="floating"
-                    fill="solid"
-                    type="password"
-                    value={password}
-                    onIonInput={e => setPassword(e.detail.value!)}
-                    required
-                  />
-                </div>
+            <IonItem>
+              <IonLabel position="stacked">Password</IonLabel>
+              <IonInput
+                type="password"
+                value={password}
+                onIonChange={e => setPassword(e.detail.value!)}
+                placeholder="Enter password"
+                required
+              />
+            </IonItem>
 
-                <IonButton
-                  expand="block"
-                  type="submit"
-                  style={{ marginTop: '2rem' }}
-                  disabled={loading}
-                >
-                  {mode === 'login' ? 'Sign In' : 'Sign Up'}
-                </IonButton>
-              </form>
-            </IonCardContent>
-          </IonCard>
+            <IonButton
+              expand="block"
+              type="submit"
+              className="ion-margin-top"
+              disabled={loading}
+            >
+              {loading ? (
+                <IonSpinner name="crescent" />
+              ) : mode === 'login' ? (
+                'Login'
+              ) : (
+                'Sign Up'
+              )}
+            </IonButton>
+          </form>
+
+          {mode === 'signup' && (
+            <IonText color="medium" className="ion-text-center ion-margin-top">
+              <p>
+                By signing up, you agree to our Terms of Service and Privacy Policy.
+              </p>
+            </IonText>
+          )}
         </div>
       </IonContent>
     </IonPage>
