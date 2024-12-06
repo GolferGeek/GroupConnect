@@ -124,21 +124,27 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signOut = async () => {
     try {
+      console.log('1. Starting signOut process');
+      
       const { error } = await supabase.auth.signOut();
+      console.log('2. Supabase signOut result:', { error });
+      
       if (error) throw error;
       
+      console.log('3. Clearing auth state');
       // Clear auth state
       setSession(null);
       setUser(null);
       setProfile(null);
       
+      console.log('4. Clearing localStorage');
       // Clear any cached data
-      localStorage.removeItem('supabase.auth.token');
+      localStorage.clear();
       
-      // Force reload to clear any remaining state
-      window.location.href = '/login';
+      // The auth state change listener will handle the redirect
+      console.log('5. SignOut process complete - waiting for auth state change');
     } catch (error) {
-      console.error('Error signing out:', error);
+      console.error('Error in signOut process:', error);
       throw error;
     }
   };

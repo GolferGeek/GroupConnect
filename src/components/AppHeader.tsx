@@ -43,6 +43,22 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
     }
   }, [user]);
 
+  const handleSignOut = async () => {
+    try {
+      console.log('Attempting to sign out...');
+      await signOut();
+      console.log('Sign out successful');
+    } catch (error) {
+      console.error('Error signing out:', error);
+      present({
+        message: 'Failed to sign out',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
   return (
     <IonHeader>
       <IonToolbar>
@@ -67,7 +83,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
               </IonText>
             </>
           )}
-          <IonButton onClick={signOut}>
+          <IonButton onClick={handleSignOut}>
             <IonIcon slot="icon-only" icon={logOutOutline} />
           </IonButton>
         </IonButtons>
