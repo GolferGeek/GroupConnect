@@ -49,7 +49,7 @@ interface Activity {
 }
 
 const ActivityDetails: React.FC = () => {
-  const { id: activityId } = useParams<{ id: string }>();
+  const { groupId, activityId } = useParams<{ groupId: string; activityId: string }>();
   const [activity, setActivity] = useState<Activity | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -59,33 +59,46 @@ const ActivityDetails: React.FC = () => {
   const [presentActionSheet] = useIonActionSheet();
 
   useEffect(() => {
-    console.log('Loading activity:', activityId);
+    console.log('Loading activity:', { groupId, activityId });
     loadActivityData();
-  }, [activityId]);
+  }, [groupId, activityId]);
 
   const loadActivityData = async () => {
-    if (!activityId || !user) {
-      console.log('Missing activityId or user');
+    if (!activityId || !groupId || !user) {
+      console.log('Missing required data:', { activityId, groupId, user });
+      history.goBack();
       return;
     }
+
     try {
-      console.log('Fetching activity data...');
+      console.log('Fetching activity data for ID:', activityId);
       // Get activity details
       const { data: activityData, error: activityError } = await supabase
         .from('activities')
-        .select('*, group:groups(name)')
+        .select(`
+          *,
+          group:groups(
+            id,
+            name
+          )
+        `)
         .eq('id', activityId)
+        .eq('group_id', groupId)
         .single();
 
-      if (activityError) throw activityError;
-      console.log('Activity data:', activityData);
+      if (activityError) {
+        console.error('Activity fetch error:', activityError);
+        throw activityError;
+      }
+      
+      console.log('Activity data loaded:', activityData);
       setActivity(activityData);
 
       // Check if user is admin of the group
       const { data: memberData, error: memberError } = await supabase
         .from('group_members')
         .select('role')
-        .eq('group_id', activityData.group_id)
+        .eq('group_id', groupId)
         .eq('user_id', user.id)
         .single();
 
@@ -104,7 +117,7 @@ const ActivityDetails: React.FC = () => {
         position: 'top',
         color: 'danger'
       });
-      history.push('/activities');
+      history.goBack();
     } finally {
       setLoading(false);
     }
@@ -119,7 +132,7 @@ const ActivityDetails: React.FC = () => {
         {
           text: 'Edit Activity',
           icon: createOutline,
-          handler: () => history.push(`/tabs/activities/${activityId}/edit`)
+          handler: () => history.push(`/groups/${groupId}/activities/${activityId}/edit`)
         },
         {
           text: 'Delete Activity',
@@ -140,7 +153,8 @@ const ActivityDetails: React.FC = () => {
       const { error } = await supabase
         .from('activities')
         .delete()
-        .eq('id', activityId);
+        .eq('id', activityId)
+        .eq('group_id', groupId);
 
       if (error) throw error;
       
@@ -151,12 +165,7 @@ const ActivityDetails: React.FC = () => {
         color: 'success'
       });
 
-      // Navigate back to the group if we have group_id
-      if (activity?.group_id) {
-        history.replace(`/groups/${activity.group_id}`);
-      } else {
-        history.replace('/activities');
-      }
+      history.replace(`/groups/${groupId}`);
     } catch (error: any) {
       present({
         message: error.message || 'Failed to delete activity',
@@ -248,7 +257,7 @@ const ActivityDetails: React.FC = () => {
       </IonContent>
       {isAdmin && (
         <IonFab vertical="bottom" horizontal="end" slot="fixed">
-          <IonFabButton onClick={() => history.push(`/activities/${activityId}/edit`)}>
+          <IonFabButton onClick={() => history.push(`/groups/${groupId}/activities/${activityId}/edit`)}>
             <IonIcon icon={createOutline} />
           </IonFabButton>
         </IonFab>

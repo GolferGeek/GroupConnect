@@ -42,15 +42,32 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
   onSubmit,
   onCancel,
 }) => {
-  const [formData, setFormData] = useState<ActivityFormData>({
-    title: '',
-    description: '',
-    date: new Date().toISOString(),
-    location: '',
-    url: '',
-    notes: '',
-    group_id: groupId || '',
-    ...initialData,
+  const [formData, setFormData] = useState<ActivityFormData>(() => {
+    const defaultDate = new Date().toISOString();
+    const initialFormData = {
+      title: '',
+      description: '',
+      date: defaultDate,
+      location: '',
+      url: '',
+      notes: '',
+      group_id: groupId || '',
+    };
+
+    if (initialData?.date) {
+      console.log('Initial date from props:', initialData.date);
+      // Ensure we have a valid date string
+      const dateObj = new Date(initialData.date);
+      const formattedDate = dateObj.toISOString();
+      console.log('Formatted initial date:', formattedDate);
+      return {
+        ...initialFormData,
+        ...initialData,
+        date: formattedDate
+      };
+    }
+
+    return initialFormData;
   });
   const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(false);
@@ -86,10 +103,17 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('ActivityForm: Starting form submission with data:', formData);
     setLoading(true);
     try {
+      console.log('ActivityForm: Calling onSubmit handler...');
       await onSubmit(formData);
+      console.log('ActivityForm: Form submission completed successfully');
+    } catch (error) {
+      console.error('ActivityForm: Error during form submission:', error);
+      throw error;
     } finally {
+      console.log('ActivityForm: Setting loading to false');
       setLoading(false);
     }
   };
@@ -97,6 +121,11 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
   const handleChange = (field: keyof ActivityFormData, value: string) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
+
+  // Debug log for date value
+  useEffect(() => {
+    console.log('Current form date value:', formData.date);
+  }, [formData.date]);
 
   if (loadingGroups) {
     return (
@@ -142,12 +171,44 @@ const ActivityForm: React.FC<ActivityFormProps> = ({
             value={formData.date}
             onIonChange={e => {
               const value = e.detail.value;
+              console.log('DateTime picker onChange value:', value);
               if (value) {
-                handleChange('date', typeof value === 'string' ? value : value[0]);
+                const dateValue = typeof value === 'string' ? value : value[0];
+                // Ensure we store the date in UTC
+                const date = new Date(dateValue);
+                const utcDate = new Date(
+                  Date.UTC(
+                    date.getFullYear(),
+                    date.getMonth(),
+                    date.getDate(),
+                    date.getHours(),
+                    date.getMinutes()
+                  )
+                ).toISOString();
+                console.log('Storing UTC date:', utcDate);
+                handleChange('date', utcDate);
               }
             }}
             min={new Date().toISOString()}
-          />
+            presentation="date-time"
+            preferWheel={true}
+            showDefaultButtons={true}
+            doneText="Set"
+            cancelText="Cancel"
+            hourCycle="h12"
+            firstDayOfWeek={0}
+            className="ion-padding-vertical"
+            style={{
+              width: '100%',
+              '--background': 'var(--ion-color-light)',
+              '--border-radius': '8px',
+              '--padding-start': '16px',
+              '--padding-end': '16px',
+            }}
+            locale="en-US"
+          >
+            <span slot="title">Select Date and Time</span>
+          </IonDatetime>
         </IonItem>
 
         <IonItem>

@@ -9,6 +9,7 @@ import {
   IonBackButton,
   IonText,
   useIonToast,
+  IonLabel,
 } from '@ionic/react';
 import { logOutOutline, personCircleOutline } from 'ionicons/icons';
 import { useAuth } from '../contexts/AuthContext';
@@ -45,9 +46,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
 
   const handleSignOut = async () => {
     try {
-      console.log('Attempting to sign out...');
+      console.log('1. Starting signOut process');
       await signOut();
-      console.log('Sign out successful');
+      console.log('2. Sign out successful');
     } catch (error) {
       console.error('Error signing out:', error);
       present({
@@ -64,14 +65,17 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
       <IonToolbar>
         <IonButtons slot="start">
           {showBackButton ? (
-            <IonBackButton defaultHref="/groups" />
+            <>
+              <IonBackButton defaultHref="/groups" />
+              <IonTitle style={{ paddingLeft: 0 }}>{title}</IonTitle>
+            </>
           ) : (
             <IonButton onClick={() => history.push('/groups')} fill="clear" color="primary">
-              <strong>GroupConnect</strong>
+              <strong className="ion-hide-breakpoint-down-sm">GroupConnect</strong>
             </IonButton>
           )}
         </IonButtons>
-        <IonTitle>{title}</IonTitle>
+        {!showBackButton && <IonTitle>{title}</IonTitle>}
         <IonButtons slot="end">
           {profile && (
             <>

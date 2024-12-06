@@ -69,19 +69,32 @@ const App: React.FC = () => {
             <Route exact path="/login">
               <Login />
             </Route>
-            <PrivateRoute path="/home">
-              <MainTabs />
+
+            {/* Group and Activity routes - most specific first */}
+            <PrivateRoute exact path="/groups/:groupId/activities/:activityId/edit">
+              <EditActivity />
+            </PrivateRoute>
+            <PrivateRoute exact path="/groups/:groupId/activities/:activityId">
+              <ActivityDetails />
+            </PrivateRoute>
+            <PrivateRoute exact path="/groups/:groupId/activities/new">
+              <CreateActivity />
+            </PrivateRoute>
+            <PrivateRoute exact path="/groups/:id">
+              <GroupDetails />
             </PrivateRoute>
             <PrivateRoute exact path="/groups">
               <MainTabs />
             </PrivateRoute>
-            <PrivateRoute path="/groups/:id">
-              <GroupDetails />
-            </PrivateRoute>
-            <PrivateRoute path="/discover">
+
+            {/* Other routes */}
+            <PrivateRoute exact path="/discover">
               <MainTabs />
             </PrivateRoute>
-            <PrivateRoute path="/activities">
+            <PrivateRoute exact path="/activities">
+              <MainTabs />
+            </PrivateRoute>
+            <PrivateRoute exact path="/home">
               <MainTabs />
             </PrivateRoute>
             <Route exact path="/role-manager" component={RoleManager} />

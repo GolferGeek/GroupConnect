@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonContent,
   IonPage,
@@ -31,6 +31,9 @@ import {
   IonToolbar,
   IonTitle,
   IonButtons,
+  IonChip,
+  IonSelect,
+  IonSelectOption,
 } from '@ionic/react';
 import {
   peopleOutline,
@@ -45,6 +48,8 @@ import {
   createOutline,
   trashOutline,
   closeOutline,
+  globeOutline,
+  lockClosedOutline,
 } from 'ionicons/icons';
 import { useParams, useHistory } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
@@ -68,6 +73,9 @@ interface GroupDetails {
   created_at: string;
   member_count: number;
   activity_count: number;
+  visibility: 'public' | 'private';
+  join_method: 'direct' | 'invitation';
+  group_type_id: number;
 }
 
 interface MemberData {
@@ -92,6 +100,11 @@ interface Activity {
   notes?: string;
 }
 
+interface GroupType {
+  id: number;
+  group_type: string;
+}
+
 const GroupDetails: React.FC = () => {
   const { id: groupId } = useParams<{ id: string }>();
   const history = useHistory();
@@ -108,6 +121,9 @@ const GroupDetails: React.FC = () => {
   const [showAddMemberModal, setShowAddMemberModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState<UserProfile[]>([]);
+  const [groupType, setGroupType] = useState<GroupType | null>(null);
+  const [groupTypes, setGroupTypes] = useState<GroupType[]>([]);
+  const [editingSettings, setEditingSettings] = useState(false);
 
   useEffect(() => {
     if (groupId === 'new') {
@@ -116,6 +132,18 @@ const GroupDetails: React.FC = () => {
     }
     loadGroupData();
   }, [groupId]);
+
+  useEffect(() => {
+    loadGroupTypes();
+  }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get('tab');
+    if (tab === 'activities' || tab === 'members' || tab === 'details') {
+      setActiveTab(tab);
+    }
+  }, []);
 
   const loadGroupData = async () => {
     if (!groupId || groupId === 'new') return;
@@ -148,10 +176,20 @@ const GroupDetails: React.FC = () => {
 
       setMembers(formattedMembers);
 
-      // Load group details and activity count
+      // Load group details, activity count, and group type
       const { data: groupData, error: groupError } = await supabase
         .from('groups')
-        .select('id, name, description, created_at, activities(count)')
+        .select(`
+          id, 
+          name, 
+          description, 
+          created_at, 
+          activities(count),
+          visibility,
+          join_method,
+          group_type_id,
+          group_type:group_types!inner(id, group_type)
+        `)
         .eq('id', groupId)
         .single();
 
@@ -161,8 +199,19 @@ const GroupDetails: React.FC = () => {
         ...groupData,
         description: groupData.description || '',
         member_count: formattedMembers.length,
-        activity_count: groupData.activities?.[0]?.count || 0
+        activity_count: groupData.activities?.[0]?.count || 0,
+        visibility: groupData.visibility || 'private',
+        join_method: groupData.join_method || 'direct',
+        group_type_id: groupData.group_type_id
       });
+
+      // Handle group type data
+      if (groupData.group_type) {
+        setGroupType({
+          id: groupData.group_type.id,
+          group_type: groupData.group_type.group_type
+        });
+      }
 
     } catch (error: any) {
       console.error('Error loading group data:', error);
@@ -221,32 +270,45 @@ const GroupDetails: React.FC = () => {
   }, [activeTab, groupId]);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString(undefined, {
-      weekday: 'short',
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    try {
+      // Parse the ISO date string and adjust for local timezone
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return 'Invalid date';
+      }
+
+      // Create UTC date to match the stored value
+      const utcDate = new Date(
+        date.getUTCFullYear(),
+        date.getUTCMonth(),
+        date.getUTCDate(),
+        date.getUTCHours(),
+        date.getUTCMinutes()
+      );
+
+      return new Intl.DateTimeFormat('en-US', {
+        weekday: 'short',
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+        timeZone: 'UTC'  // Use UTC to match stored value
+      }).format(utcDate);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'Invalid date';
+    }
   };
 
   const isUserAdmin = members.find(m => m.id === user?.id)?.role === 'admin';
 
   const handleSaveDescription = async (newDescription: string) => {
-    if (!groupId || !groupDetails) {
-      present({
-        message: 'Group information is missing',
-        duration: 3000,
-        position: 'top',
-        color: 'danger'
-      });
-      return;
-    }
+    if (!groupId || !groupDetails) return;
 
     try {
-      console.log('Saving description:', { groupId, newDescription });
       const { data, error } = await supabase
         .from('groups')
         .update({ description: newDescription })
@@ -254,12 +316,8 @@ const GroupDetails: React.FC = () => {
         .select()
         .single();
 
-      if (error) {
-        console.error('Error saving description:', error);
-        throw error;
-      }
+      if (error) throw error;
 
-      console.log('Description saved:', data);
       setGroupDetails(prev => {
         if (!prev) return null;
         return {
@@ -341,19 +399,21 @@ const GroupDetails: React.FC = () => {
         .eq('user_id', memberId);
 
       if (error) throw error;
-      setMembers(members.map(m => 
-        m.id === memberId ? { ...m, role: newRole } : m
+
+      // Update local state
+      setMembers(members.map(member => 
+        member.id === memberId ? { ...member, role: newRole } : member
       ));
-      
+
       present({
-        message: 'Role updated successfully',
+        message: `Member role updated to ${newRole}`,
         duration: 2000,
         position: 'top',
         color: 'success'
       });
     } catch (error: any) {
       present({
-        message: error.message || 'Failed to update role',
+        message: error.message || 'Failed to update member role',
         duration: 3000,
         position: 'top',
         color: 'danger'
@@ -452,6 +512,55 @@ const GroupDetails: React.FC = () => {
     setSearchResults([]);
   };
 
+  const loadGroupTypes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('group_types')
+        .select('id, group_type')
+        .order('group_type');
+
+      if (error) throw error;
+      setGroupTypes(data || []);
+    } catch (error: any) {
+      console.error('Error loading group types:', error);
+    }
+  };
+
+  const updateGroupSettings = async (settings: Partial<GroupDetails>) => {
+    if (!groupId || !groupDetails) return;
+
+    try {
+      console.log('Updating settings:', settings);
+      const { error } = await supabase
+        .from('groups')
+        .update(settings)
+        .eq('id', groupId);
+
+      if (error) throw error;
+
+      // Update local state
+      setGroupDetails(prev => {
+        if (!prev) return null;
+        return { ...prev, ...settings };
+      });
+
+      present({
+        message: 'Group settings updated successfully',
+        duration: 2000,
+        position: 'top',
+        color: 'success'
+      });
+    } catch (error: any) {
+      console.error('Failed to update settings:', error);
+      present({
+        message: error.message || 'Failed to update group settings',
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
+    }
+  };
+
   if (groupId === 'new') {
     return <CreateGroup />;
   }
@@ -471,238 +580,315 @@ const GroupDetails: React.FC = () => {
 
   return (
     <IonPage>
-      <AppHeader title={groupDetails?.name || 'Group'} showBackButton />
+      <AppHeader title="Group" showBackButton />
       <IonContent>
-        <IonSegment 
-          value={activeTab} 
-          onIonChange={e => setActiveTab(e.detail.value as 'details' | 'members' | 'activities')}
-        >
-          <IonSegmentButton value="details">
-            <IonIcon icon={settingsOutline} />
-            <IonLabel>Details</IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="members">
-            <IonIcon icon={peopleOutline} />
-            <IonLabel>
-              Members
-              <IonBadge color="primary" className="ion-margin-start">
-                {groupDetails?.member_count || 0}
-              </IonBadge>
-            </IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="activities">
-            <IonIcon icon={calendarOutline} />
-            <IonLabel>
-              Activities
-              <IonBadge color="primary" className="ion-margin-start">
-                {groupDetails?.activity_count || 0}
-              </IonBadge>
-            </IonLabel>
-          </IonSegmentButton>
-        </IonSegment>
+        {loading ? (
+          <div className="ion-text-center ion-padding">
+            <IonSpinner />
+          </div>
+        ) : groupDetails ? (
+          <>
+            <div className="ion-padding-horizontal ion-padding-top">
+              <h1 style={{ margin: '0 0 8px 0' }}>{groupDetails.name}</h1>
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <IonChip color="primary" outline>
+                  <IonLabel>{groupType?.group_type || 'General'}</IonLabel>
+                </IonChip>
+                <IonChip color={groupDetails?.visibility === 'public' ? 'success' : 'medium'} outline>
+                  <IonIcon icon={groupDetails?.visibility === 'public' ? globeOutline : lockClosedOutline} />
+                  <IonLabel>{groupDetails?.visibility === 'public' ? 'Public' : 'Private'}</IonLabel>
+                </IonChip>
+              </div>
+            </div>
 
-        {activeTab === 'details' && (
-          <div className="ion-padding">
-            {isEditing ? (
-              <MarkdownEditor
-                content={groupDetails?.description || ''}
-                onSave={handleSaveDescription}
-                onCancel={() => setIsEditing(false)}
-              />
-            ) : (
-              <>
-                <div className="ion-margin-bottom">
-                  {groupDetails?.description ? (
-                    <MarkdownViewer
-                      content={groupDetails.description}
-                      onEdit={() => setIsEditing(true)}
-                      canEdit={isUserAdmin}
-                    />
-                  ) : (
-                    <div className="ion-text-center ion-padding">
-                      <IonText color="medium">
-                        <p>No description yet.</p>
-                        {isUserAdmin && (
-                          <IonButton fill="clear" onClick={() => setIsEditing(true)}>
+            <IonSegment 
+              value={activeTab} 
+              onIonChange={e => setActiveTab(e.detail.value as 'details' | 'members' | 'activities')}
+            >
+              <IonSegmentButton value="details">
+                <IonIcon icon={settingsOutline} />
+                <IonLabel>Details</IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton value="members">
+                <IonIcon icon={peopleOutline} />
+                <IonLabel>
+                  Members
+                  <IonBadge color="primary" className="ion-margin-start">
+                    {groupDetails?.member_count || 0}
+                  </IonBadge>
+                </IonLabel>
+              </IonSegmentButton>
+              <IonSegmentButton value="activities">
+                <IonIcon icon={calendarOutline} />
+                <IonLabel>
+                  Activities
+                  <IonBadge color="primary" className="ion-margin-start">
+                    {groupDetails?.activity_count || 0}
+                  </IonBadge>
+                </IonLabel>
+              </IonSegmentButton>
+            </IonSegment>
+
+            {activeTab === 'details' && (
+              <div className="ion-padding">
+                {isUserAdmin && (
+                  <IonCard>
+                    <IonCardHeader>
+                      <IonCardTitle>Group Settings</IonCardTitle>
+                    </IonCardHeader>
+                    <IonCardContent>
+                      <IonList>
+                        <IonItem>
+                          <IonLabel position="stacked">Group Type</IonLabel>
+                          <IonSelect
+                            value={groupDetails?.group_type_id}
+                            onIonChange={e => updateGroupSettings({ group_type_id: e.detail.value })}
+                            interface="action-sheet"
+                          >
+                            {groupTypes.map(type => (
+                              <IonSelectOption key={type.id} value={type.id}>
+                                {type.group_type}
+                              </IonSelectOption>
+                            ))}
+                          </IonSelect>
+                        </IonItem>
+
+                        <IonItem>
+                          <IonLabel position="stacked">Visibility</IonLabel>
+                          <IonSelect
+                            value={groupDetails?.visibility}
+                            onIonChange={e => updateGroupSettings({ visibility: e.detail.value })}
+                            interface="action-sheet"
+                          >
+                            <IonSelectOption value="public">Public</IonSelectOption>
+                            <IonSelectOption value="private">Private</IonSelectOption>
+                          </IonSelect>
+                        </IonItem>
+
+                        <IonItem>
+                          <IonLabel position="stacked">Join Method</IonLabel>
+                          <IonSelect
+                            value={groupDetails?.join_method}
+                            onIonChange={e => {
+                              console.log('Selected join method:', e.detail.value);
+                              updateGroupSettings({ join_method: e.detail.value });
+                            }}
+                            interface="action-sheet"
+                          >
+                            <IonSelectOption value="direct">Direct (anyone can join)</IonSelectOption>
+                            <IonSelectOption value="invitation">Invitation Only</IonSelectOption>
+                          </IonSelect>
+                        </IonItem>
+                      </IonList>
+                    </IonCardContent>
+                  </IonCard>
+                )}
+
+                <IonCard>
+                  <IonCardHeader>
+                    <IonCardTitle>Description</IonCardTitle>
+                  </IonCardHeader>
+                  <IonCardContent>
+                    {isEditing ? (
+                      <MarkdownEditor
+                        content={groupDetails?.description || ''}
+                        onSave={handleSaveDescription}
+                        onCancel={() => setIsEditing(false)}
+                      />
+                    ) : (
+                      <>
+                        {groupDetails?.description ? (
+                          <div onClick={() => isUserAdmin && setIsEditing(true)}>
+                            <MarkdownViewer content={groupDetails.description} />
+                          </div>
+                        ) : isUserAdmin ? (
+                          <IonButton
+                            fill="clear"
+                            onClick={() => setIsEditing(true)}
+                          >
                             Add Description
                           </IonButton>
+                        ) : (
+                          <IonText color="medium">
+                            <p>No description available</p>
+                          </IonText>
                         )}
-                      </IonText>
-                    </div>
-                  )}
-                </div>
+                      </>
+                    )}
+                  </IonCardContent>
+                </IonCard>
+
                 {isUserAdmin && (
-                  <div className="ion-padding-top">
-                    <IonButton
-                      expand="block"
-                      color="danger"
-                      onClick={() => {
-                        presentActionSheet({
-                          header: 'Delete Group',
-                          subHeader: 'This action cannot be undone',
-                          buttons: [
-                            {
-                              text: 'Delete',
-                              role: 'destructive',
-                              handler: handleDeleteGroup
-                            },
-                            {
-                              text: 'Cancel',
-                              role: 'cancel'
-                            }
-                          ]
-                        });
-                      }}
-                    >
-                      <IonIcon slot="start" icon={trashOutline} />
-                      Delete Group
-                    </IonButton>
-                  </div>
+                  <IonButton
+                    expand="block"
+                    color="danger"
+                    className="ion-margin-top"
+                    onClick={() => {
+                      presentActionSheet({
+                        header: 'Delete Group',
+                        subHeader: 'This action cannot be undone',
+                        buttons: [
+                          {
+                            text: 'Delete',
+                            role: 'destructive',
+                            handler: handleDeleteGroup
+                          },
+                          {
+                            text: 'Cancel',
+                            role: 'cancel'
+                          }
+                        ]
+                      });
+                    }}
+                  >
+                    <IonIcon slot="start" icon={trashOutline} />
+                    Delete Group
+                  </IonButton>
                 )}
-              </>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'members' && (
-          <div className="ion-padding">
-            <IonList>
-              {members.map(member => (
-                <IonItemSliding key={member.id}>
-                  <IonItem>
-                    <IonLabel>
-                      <h2>{member.username}</h2>
-                      <p>{member.email}</p>
-                    </IonLabel>
-                    <IonBadge color={member.role === 'admin' ? 'success' : 'medium'} slot="end">
-                      {member.role}
-                    </IonBadge>
-                  </IonItem>
-                  {isUserAdmin && member.id !== user?.id && (
-                    <IonItemOptions side="end">
-                      <IonItemOption
-                        color={member.role === 'admin' ? 'medium' : 'primary'}
-                        onClick={() => updateMemberRole(member.id, member.role === 'admin' ? 'member' : 'admin')}
-                      >
-                        {member.role === 'admin' ? 'Make Member' : 'Make Admin'}
-                      </IonItemOption>
-                      <IonItemOption color="danger" onClick={() => removeMember(member.id)}>
-                        Remove
-                      </IonItemOption>
-                    </IonItemOptions>
-                  )}
-                </IonItemSliding>
-              ))}
-            </IonList>
-
-            {isUserAdmin && (
-              <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                <IonFabButton onClick={() => setShowAddMemberModal(true)}>
-                  <IonIcon icon={personAddOutline} />
-                </IonFabButton>
-              </IonFab>
-            )}
-          </div>
-        )}
-
-        {activeTab === 'activities' && (
-          <div className="ion-padding">
-            {activities.length === 0 ? (
-              <div className="ion-text-center">
-                <IonIcon
-                  icon={calendarOutline}
-                  style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
-                />
-                <IonText color="medium">
-                  <p>No upcoming activities</p>
-                  <p>Create one to get started!</p>
-                </IonText>
               </div>
-            ) : (
-              <IonList>
-                {activities.map(activity => (
-                  <IonItemSliding key={activity.id}>
-                    <IonItem button onClick={() => history.push(`/activities/${activity.id}`)}>
+            )}
+
+            {activeTab === 'members' && (
+              <div className="ion-padding">
+                <IonList>
+                  {members.map(member => (
+                    <IonItemSliding key={member.id}>
+                      <IonItem>
+                        <IonLabel>
+                          <h2>{member.username}</h2>
+                          <p>{member.email}</p>
+                        </IonLabel>
+                        <IonBadge color={member.role === 'admin' ? 'success' : 'medium'} slot="end">
+                          {member.role}
+                        </IonBadge>
+                      </IonItem>
+                      {isUserAdmin && member.id !== user?.id && (
+                        <IonItemOptions side="end">
+                          <IonItemOption
+                            color={member.role === 'admin' ? 'medium' : 'success'}
+                            onClick={() => updateMemberRole(member.id, member.role === 'admin' ? 'member' : 'admin')}
+                          >
+                            {member.role === 'admin' ? 'Remove Admin' : 'Make Admin'}
+                          </IonItemOption>
+                          <IonItemOption color="danger" onClick={() => removeMember(member.id)}>
+                            Remove
+                          </IonItemOption>
+                        </IonItemOptions>
+                      )}
+                    </IonItemSliding>
+                  ))}
+                </IonList>
+
+                {isUserAdmin && (
+                  <IonFab vertical="bottom" horizontal="end" slot="fixed">
+                    <IonFabButton onClick={() => setShowAddMemberModal(true)}>
+                      <IonIcon icon={personAddOutline} />
+                    </IonFabButton>
+                  </IonFab>
+                )}
+              </div>
+            )}
+
+            {activeTab === 'activities' && (
+              <div className="ion-padding">
+                {activities.length === 0 ? (
+                  <div className="ion-text-center">
+                    <IonIcon
+                      icon={calendarOutline}
+                      style={{ fontSize: '64px', color: 'var(--ion-color-medium)' }}
+                    />
+                    <IonText color="medium">
+                      <p>No upcoming activities</p>
+                      <p>Create one to get started!</p>
+                    </IonText>
+                  </div>
+                ) : (
+                  <IonList>
+                    {activities.map(activity => (
+                      <IonItemSliding key={activity.id}>
+                        <IonItem button onClick={() => history.push(`/groups/${groupId}/activities/${activity.id}`)}>
+                          <IonLabel>
+                            <h2>{activity.title}</h2>
+                            <p>{formatDate(activity.date)}</p>
+                            {activity.location && <p>{activity.location}</p>}
+                          </IonLabel>
+                        </IonItem>
+                        {isUserAdmin && (
+                          <IonItemOptions side="end">
+                            <IonItemOption 
+                              color="primary" 
+                              onClick={() => history.push(`/groups/${groupId}/activities/${activity.id}/edit`)}
+                            >
+                              <IonIcon slot="icon-only" icon={createOutline} />
+                            </IonItemOption>
+                          </IonItemOptions>
+                        )}
+                      </IonItemSliding>
+                    ))}
+                  </IonList>
+                )}
+                
+                {isUserAdmin && (
+                  <IonFab vertical="bottom" horizontal="end" slot="fixed">
+                    <IonFabButton onClick={() => history.push(`/groups/${groupId}/activities/new`)}>
+                      <IonIcon icon={addOutline} />
+                    </IonFabButton>
+                  </IonFab>
+                )}
+              </div>
+            )}
+
+            <IonModal 
+              isOpen={showAddMemberModal} 
+              onDidDismiss={handleCloseModal}
+              presentingElement={document.querySelector('ion-page') as HTMLElement | undefined}
+            >
+              <IonHeader>
+                <IonToolbar>
+                  <IonTitle>Add Member</IonTitle>
+                  <IonButtons slot="end">
+                    <IonButton onClick={handleCloseModal}>Close</IonButton>
+                  </IonButtons>
+                </IonToolbar>
+              </IonHeader>
+
+              <IonContent className="ion-padding">
+                <IonSearchbar
+                  value={searchTerm}
+                  onIonInput={e => {
+                    const value = e.detail.value!;
+                    setSearchTerm(value);
+                    searchUsers(value);
+                  }}
+                  placeholder="Search by username or email"
+                  debounce={300}
+                />
+
+                {searchTerm.length > 0 && searchTerm.length < 3 && (
+                  <IonNote className="ion-padding">
+                    Type at least 3 characters to search
+                  </IonNote>
+                )}
+
+                <IonList>
+                  {searchResults.map(user => (
+                    <IonItem key={user.id} button onClick={() => addMember(user.id)}>
                       <IonLabel>
-                        <h2>{activity.title}</h2>
-                        <p>{formatDate(activity.date)}</p>
-                        {activity.location && <p>{activity.location}</p>}
+                        <h2>{user.username}</h2>
+                        <p>{user.email}</p>
                       </IonLabel>
                     </IonItem>
-                    {isUserAdmin && (
-                      <IonItemOptions side="end">
-                        <IonItemOption 
-                          color="primary" 
-                          onClick={() => history.push(`/activities/${activity.id}/edit`)}
-                        >
-                          <IonIcon slot="icon-only" icon={createOutline} />
-                        </IonItemOption>
-                      </IonItemOptions>
-                    )}
-                  </IonItemSliding>
-                ))}
-              </IonList>
-            )}
-            
-            {isUserAdmin && (
-              <IonFab vertical="bottom" horizontal="end" slot="fixed">
-                <IonFabButton onClick={() => history.push(`/groups/${groupId}/activities/new`)}>
-                  <IonIcon icon={addOutline} />
-                </IonFabButton>
-              </IonFab>
-            )}
-          </div>
-        )}
-
-        <IonModal 
-          isOpen={showAddMemberModal} 
-          onDidDismiss={handleCloseModal}
-          presentingElement={document.querySelector('ion-page') as HTMLElement | undefined}
-        >
-          <IonHeader>
-            <IonToolbar>
-              <IonTitle>Add Member</IonTitle>
-              <IonButtons slot="end">
-                <IonButton onClick={handleCloseModal}>Close</IonButton>
-              </IonButtons>
-            </IonToolbar>
-          </IonHeader>
-
-          <IonContent className="ion-padding">
-            <IonSearchbar
-              value={searchTerm}
-              onIonInput={e => {
-                const value = e.detail.value!;
-                setSearchTerm(value);
-                searchUsers(value);
-              }}
-              placeholder="Search by username or email"
-              debounce={300}
-            />
-
-            {searchTerm.length > 0 && searchTerm.length < 3 && (
-              <IonNote className="ion-padding">
-                Type at least 3 characters to search
-              </IonNote>
-            )}
-
-            <IonList>
-              {searchResults.map(user => (
-                <IonItem key={user.id} button onClick={() => addMember(user.id)}>
-                  <IonLabel>
-                    <h2>{user.username}</h2>
-                    <p>{user.email}</p>
-                  </IonLabel>
-                </IonItem>
-              ))}
-              {searchTerm.length >= 3 && searchResults.length === 0 && (
-                <IonItem>
-                  <IonLabel>No users found</IonLabel>
-                </IonItem>
-              )}
-            </IonList>
-          </IonContent>
-        </IonModal>
+                  ))}
+                  {searchTerm.length >= 3 && searchResults.length === 0 && (
+                    <IonItem>
+                      <IonLabel>No users found</IonLabel>
+                    </IonItem>
+                  )}
+                </IonList>
+              </IonContent>
+            </IonModal>
+          </>
+        ) : null}
       </IonContent>
     </IonPage>
   );
