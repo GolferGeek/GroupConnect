@@ -46,11 +46,15 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
   return (
     <IonHeader>
       <IonToolbar>
-        {showBackButton && (
-          <IonButtons slot="start">
+        <IonButtons slot="start">
+          {showBackButton ? (
             <IonBackButton defaultHref="/groups" />
-          </IonButtons>
-        )}
+          ) : (
+            <IonButton onClick={() => history.push('/groups')} fill="clear" color="primary">
+              <strong>GroupConnect</strong>
+            </IonButton>
+          )}
+        </IonButtons>
         <IonTitle>{title}</IonTitle>
         <IonButtons slot="end">
           {profile && (

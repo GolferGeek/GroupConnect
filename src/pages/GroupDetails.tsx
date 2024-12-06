@@ -180,6 +180,8 @@ const GroupDetails: React.FC = () => {
 
   const loadActivities = async () => {
     if (!groupId || groupId === 'new') return;
+    console.log('Loading activities for group:', groupId);
+    console.log('Current date:', new Date().toISOString());
     try {
       const { data, error } = await supabase
         .from('activities')
@@ -188,9 +190,21 @@ const GroupDetails: React.FC = () => {
         .gte('date', new Date().toISOString())
         .order('date', { ascending: true });
 
+      console.log('Activities query result:', { 
+        data, 
+        error,
+        queryDetails: {
+          groupId,
+          filterDate: new Date().toISOString(),
+          resultCount: data?.length || 0
+        }
+      });
+      
       if (error) throw error;
       setActivities(data || []);
+      console.log('Activities state updated:', data?.length || 0, 'activities');
     } catch (error: any) {
+      console.error('Error loading activities:', error);
       present({
         message: error.message || 'Failed to load activities',
         duration: 3000,
