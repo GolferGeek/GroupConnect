@@ -45,17 +45,25 @@ const Groups: React.FC = () => {
   const [presentActionSheet] = useIonActionSheet();
 
   useEffect(() => {
-    loadGroups();
+    if (user) {
+      loadGroups();
+    }
   }, [user]);
 
   // Refresh data when the page becomes active
   useIonViewWillEnter(() => {
-    console.log('Groups page will enter, refreshing data...');
-    loadGroups();
+    if (user) {
+      console.log('Groups page will enter, refreshing data...');
+      setLoading(true);  // Set loading to true before refreshing
+      loadGroups();
+    }
   });
 
   const loadGroups = async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       console.log('Loading groups...');
@@ -73,13 +81,18 @@ const Groups: React.FC = () => {
 
       console.log('Groups data:', groupsData);
 
+      if (!groupsData) {
+        setGroups([]);
+        return;
+      }
+
       // Format the data
-      const formattedGroups = groupsData?.map(group => ({
+      const formattedGroups = groupsData.map(group => ({
         ...group,
         role: group.group_members[0].role,
         member_count: 0, // Will be updated below
         activity_count: group.activities?.[0]?.count || 0
-      })) || [];
+      }));
 
       // Get member counts for each group
       for (const group of formattedGroups) {
@@ -103,6 +116,7 @@ const Groups: React.FC = () => {
         position: 'top',
         color: 'danger'
       });
+      setGroups([]); // Set empty array on error
     } finally {
       setLoading(false);
     }

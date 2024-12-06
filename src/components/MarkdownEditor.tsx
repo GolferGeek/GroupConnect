@@ -14,30 +14,33 @@ interface MarkdownEditorProps {
 }
 
 const MarkdownEditor: React.FC<MarkdownEditorProps> = ({ content, onSave, onCancel }) => {
-  const [value, setValue] = useState(content || '');
+  const [text, setText] = useState(content || '# Group Description');
 
   useEffect(() => {
-    console.log('MarkdownEditor content prop changed:', content);
-    setValue(content || '');
+    setText(content || '# Group Description');
   }, [content]);
 
+  const handleChange = (event: CustomEvent) => {
+    const newValue = event.detail.value || '';
+    console.log('Text changed:', { old: text, new: newValue });
+    setText(newValue);
+  };
+
   const handleSave = () => {
-    console.log('MarkdownEditor saving value:', value);
-    onSave(value || '');
+    const trimmedValue = text.trim();
+    console.log('Saving text:', { original: text, trimmed: trimmedValue });
+    onSave(trimmedValue || '# Group Description');
   };
 
   return (
     <div>
       <IonTextarea
-        value={value}
-        onIonChange={e => {
-          const newValue = e.detail.value || '';
-          console.log('MarkdownEditor text changed:', newValue);
-          setValue(newValue);
-        }}
+        value={text}
+        onIonInput={handleChange}
         placeholder="Enter description (supports Markdown)"
         rows={10}
         className="ion-margin-bottom"
+        autoGrow={true}
       />
       <div className="ion-text-end">
         <IonButton fill="clear" onClick={onCancel}>
