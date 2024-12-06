@@ -67,15 +67,21 @@ const AppHeader: React.FC<AppHeaderProps> = ({ title, showBackButton }) => {
           {showBackButton ? (
             <>
               <IonBackButton defaultHref="/groups" />
+              {/* Title commented out to save space
               <IonTitle style={{ paddingLeft: 0 }}>{title}</IonTitle>
+              */}
             </>
           ) : (
             <IonButton onClick={() => history.push('/groups')} fill="clear" color="primary">
+              {/* GroupConnect text commented out to save space
               <strong className="ion-hide-breakpoint-down-sm">GroupConnect</strong>
+              */}
             </IonButton>
           )}
         </IonButtons>
+        {/* Main title commented out to save space
         {!showBackButton && <IonTitle>{title}</IonTitle>}
+        */}
         <IonButtons slot="end">
           {profile && (
             <>
