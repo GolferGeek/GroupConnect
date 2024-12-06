@@ -69,13 +69,12 @@ interface GroupMemberDetails extends UserProfile {
 interface GroupDetails {
   id: string;
   name: string;
-  description?: string;
-  created_at: string;
+  description: string;
   member_count: number;
   activity_count: number;
   visibility: 'public' | 'private';
   join_method: 'direct' | 'invitation';
-  group_type_id: number;
+  group_type_id?: string;
 }
 
 interface MemberData {
@@ -101,7 +100,7 @@ interface Activity {
 }
 
 interface GroupType {
-  id: number;
+  id: string;
   group_type: string;
 }
 
@@ -188,7 +187,7 @@ const GroupDetails: React.FC = () => {
           visibility,
           join_method,
           group_type_id,
-          group_type:group_types!inner(id, group_type)
+          group_type:group_types(*)
         `)
         .eq('id', groupId)
         .single();
@@ -206,11 +205,15 @@ const GroupDetails: React.FC = () => {
       });
 
       // Handle group type data
-      if (groupData.group_type) {
+      if (groupData.group_type && Array.isArray(groupData.group_type) && groupData.group_type.length > 0) {
+        const [typeData] = groupData.group_type;  // Destructure the first item from the array
+        console.log('Group type data:', typeData);
         setGroupType({
-          id: groupData.group_type.id,
-          group_type: groupData.group_type.group_type
+          id: typeData?.id || '',
+          group_type: typeData?.group_type || ''
         });
+      } else {
+        console.log('No group type data found:', groupData.group_type);
       }
 
     } catch (error: any) {
