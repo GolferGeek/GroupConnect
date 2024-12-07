@@ -73,15 +73,37 @@ export interface JoinRequest {
 
 // User operations
 export const createUserProfile = async (userData: Omit<UserProfile, 'created_at'>) => {
-  const { error } = await supabase
+  // First check if profile exists
+  const { data: existingProfile } = await supabase
     .from('profiles')
-    .insert([{
-      ...userData,
-      role_id: userData.role_id || 2,  // default role is member (2)
-      user_type_id: userData.user_type_id,
-      other_types: userData.other_types || []
-    }]);
-  if (error) throw error;
+    .select('*')
+    .eq('id', userData.id)
+    .single();
+
+  if (existingProfile) {
+    // If profile exists, update it
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        ...userData,
+        role_id: userData.role_id || 2,  // default role is member (2)
+        user_type_id: userData.user_type_id,
+        other_types: userData.other_types || []
+      })
+      .eq('id', userData.id);
+    if (error) throw error;
+  } else {
+    // If profile doesn't exist, create it
+    const { error } = await supabase
+      .from('profiles')
+      .insert([{
+        ...userData,
+        role_id: userData.role_id || 2,  // default role is member (2)
+        user_type_id: userData.user_type_id,
+        other_types: userData.other_types || []
+      }]);
+    if (error) throw error;
+  }
 };
 
 export const getDefaultUserTypeId = async (): Promise<number> => {
@@ -95,15 +117,20 @@ export const getDefaultUserTypeId = async (): Promise<number> => {
   return data.id;
 };
 
-export const getUserProfile = async (userId: string): Promise<UserProfile> => {
-  const { data, error } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', userId)
-    .single();
+export const getUserProfile = async (userId: string): Promise<UserProfile | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', userId)
+      .maybeSingle();
 
-  if (error) throw error;
-  return data;
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    throw error;
+  }
 };
 
 export const updateUserProfile = async (userId: string, updates: Partial<Omit<UserProfile, 'id' | 'created_at'>>) => {

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState } from 'react';
-import { User, AuthResponse, Session } from '@supabase/supabase-js';
+import { User, AuthResponse, Session, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../config/supabase';
 import { createUserProfile, getUserProfile, UserProfile } from '../services/database';
 
@@ -21,13 +21,26 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const loadUserProfile = async (userId: string) => {
+    try {
+      const profile = await getUserProfile(userId);
+      setProfile(profile);
+    } catch (error: any) {
+      console.error('Error loading user profile:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
+    setLoading(true);
     // Get initial session
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('Initial session:', initialSession);
       setSession(initialSession);
       setUser(initialSession?.user ?? null);
       if (initialSession?.user) {
-        loadUserProfile(initialSession.user);
+        loadUserProfile(initialSession.user.id);
       } else {
         setLoading(false);
       }
@@ -35,77 +48,159 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      console.log('Auth state changed:', _event, session);
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        await loadUserProfile(session.user);
+        await loadUserProfile(session.user.id);
       } else {
         setProfile(null);
         setLoading(false);
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
-  const loadUserProfile = async (user: User) => {
+  const signUp = async (email: string, password: string, username: string): Promise<AuthResponse> => {
     try {
-      const userProfile = await getUserProfile(user.id);
-      setProfile(userProfile);
-    } catch (error) {
-      console.error('Error loading user profile:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+      setLoading(true);
+      console.log('Starting signup process...');
+      
+      // Default role ID for member (2)
+      const DEFAULT_ROLE_ID = 2;
+      // Default user type ID (1)
+      const DEFAULT_TYPE_ID = 1;
 
-  const signUp = async (email: string, password: string, username: string) => {
-    try {
-      const { data: roleData, error: roleError } = await supabase
-        .from('user_roles')
-        .select('id')
-        .eq('name', 'member')
-        .single();
+      // Get the member role if possible, otherwise use default
+      let roleId = DEFAULT_ROLE_ID;
+      try {
+        const { data: roleData, error: roleError } = await supabase
+          .from('user_roles')
+          .select('*')
+          .limit(1);
 
-      if (roleError) throw roleError;
+        console.log('Available role data:', roleData);
+        
+        if (!roleError && roleData && roleData.length > 0) {
+          roleId = roleData[0].id || DEFAULT_ROLE_ID;
+        }
+      } catch (error) {
+        console.warn('Could not fetch role ID, using default:', error);
+      }
 
-      const { data: typeData, error: typeError } = await supabase
-        .from('user_types')
-        .select('id')
-        .eq('type', 'General')
-        .single();
+      // Get the general user type, with fallback to default
+      let typeId = DEFAULT_TYPE_ID;
+      try {
+        const { data: typeData, error: typeError } = await supabase
+          .from('user_types')
+          .select('*')
+          .limit(1);
 
-      if (typeError) throw typeError;
+        console.log('Available type data:', typeData);
+        
+        if (!typeError && typeData && typeData.length > 0) {
+          typeId = typeData[0].id || DEFAULT_TYPE_ID;
+        }
+      } catch (error) {
+        console.warn('Could not fetch type ID, using default:', error);
+      }
 
+      console.log('Creating auth user with email:', email);
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error in auth signup:', error);
+        // Show user-friendly error message
+        const toast = document.createElement('ion-toast');
+        toast.message = error.message === 'User already registered'
+          ? 'This email is already registered. Please log in instead.'
+          : 'Unable to create account. Please try again.';
+        toast.duration = 5000;
+        toast.position = 'top';
+        toast.color = 'warning';
+        document.body.appendChild(toast);
+        await toast.present();
+        
+        setLoading(false);
+        return { data: { user: null, session: null }, error };
+      }
+
+      console.log('Auth signup successful:', data);
 
       if (data?.user) {
-        await createUserProfile({
+        const profileData = {
           id: data.user.id,
           email,
           username,
-          role_id: roleData.id,
-          user_type_id: typeData.id
-        });
+          role_id: roleId,
+          user_type_id: typeId
+        };
+
+        console.log('Creating/updating user profile with:', profileData);
+        try {
+          await createUserProfile(profileData);
+          console.log('Profile creation/update successful');
+          
+          // Show success message about email verification
+          const toast = document.createElement('ion-toast');
+          toast.message = 'Account created successfully! Please check your email for a verification link.';
+          toast.duration = 5000;
+          toast.position = 'top';
+          toast.color = 'success';
+          document.body.appendChild(toast);
+          await toast.present();
+          
+        } catch (profileError: any) {
+          console.error('Error in profile creation:', profileError);
+          
+          // Show user-friendly error message
+          const toast = document.createElement('ion-toast');
+          toast.message = 'This email is already registered. Please log in instead.';
+          toast.duration = 5000;
+          toast.position = 'top';
+          toast.color = 'warning';
+          document.body.appendChild(toast);
+          await toast.present();
+          
+          setLoading(false);
+          return { 
+            data: { user: null, session: null }, 
+            error: new AuthError('Account already exists')
+          };
+        }
       }
 
+      setLoading(false);
       return { data, error: null };
     } catch (error: any) {
-      console.error('Error signing up:', error);
+      console.error('Error in signup process:', error);
+      
+      // Show generic error message
+      const toast = document.createElement('ion-toast');
+      toast.message = 'Unable to create account. Please try again.';
+      toast.duration = 5000;
+      toast.position = 'top';
+      toast.color = 'danger';
+      document.body.appendChild(toast);
+      await toast.present();
+      
+      setLoading(false);
       return {
         data: { user: null, session: null },
-        error
+        error: error instanceof AuthError ? error : new AuthError(error.message)
       };
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signIn = async (email: string, password: string): Promise<AuthResponse> => {
     try {
+      setLoading(true);
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -119,11 +214,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         data: { user: null, session: null },
         error
       };
+    } finally {
+      setLoading(false);
     }
   };
 
   const signOut = async () => {
     try {
+      setLoading(true);
       console.log('1. Starting signOut process');
       
       const { error } = await supabase.auth.signOut();
@@ -146,6 +244,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       console.error('Error in signOut process:', error);
       throw error;
+    } finally {
+      setLoading(false);
     }
   };
 

@@ -18,6 +18,8 @@ import { useHistory } from 'react-router-dom';
 const Login: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordsMatch, setPasswordsMatch] = useState(true);
   const [username, setUsername] = useState('');
   const [mode, setMode] = useState<'login' | 'signup'>('login');
   const [loading, setLoading] = useState(false);
@@ -25,6 +27,30 @@ const Login: React.FC = () => {
   const history = useHistory();
   const [present] = useIonToast();
   const [error, setError] = useState('');
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (mode === 'signup' && confirmPassword) {
+      setPasswordsMatch(value === confirmPassword);
+      if (value !== confirmPassword) {
+        setError('Passwords do not match');
+      } else {
+        setError('');
+      }
+    }
+  };
+
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+    if (mode === 'signup') {
+      setPasswordsMatch(value === password);
+      if (value !== password) {
+        setError('Passwords do not match');
+      } else {
+        setError('');
+      }
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -35,6 +61,9 @@ const Login: React.FC = () => {
       if (mode === 'signup') {
         if (!username.trim()) {
           throw new Error('Username is required');
+        }
+        if (!passwordsMatch) {
+          throw new Error('Passwords do not match');
         }
         const response = await signUp(email, password, username);
         if (response.error) {
@@ -52,6 +81,12 @@ const Login: React.FC = () => {
       }
     } catch (error: any) {
       setError(error.message);
+      present({
+        message: error.message,
+        duration: 3000,
+        position: 'top',
+        color: 'danger'
+      });
     } finally {
       setLoading(false);
     }
@@ -65,7 +100,12 @@ const Login: React.FC = () => {
           
           <IonSegment 
             value={mode} 
-            onIonChange={e => setMode(e.detail.value as 'login' | 'signup')}
+            onIonChange={e => {
+              setMode(e.detail.value as 'login' | 'signup');
+              setError('');
+              setPassword('');
+              setConfirmPassword('');
+            }}
             className="ion-margin-bottom"
           >
             <IonSegmentButton value="login">
@@ -82,7 +122,7 @@ const Login: React.FC = () => {
                 <IonLabel position="stacked">Username</IonLabel>
                 <IonInput
                   value={username}
-                  onIonChange={e => setUsername(e.detail.value!)}
+                  onIonChange={e => setUsername(e.detail.value ?? '')}
                   placeholder="Enter username"
                   required
                 />
@@ -94,7 +134,7 @@ const Login: React.FC = () => {
               <IonInput
                 type="email"
                 value={email}
-                onIonChange={e => setEmail(e.detail.value!)}
+                onIonChange={e => setEmail(e.detail.value ?? '')}
                 placeholder="Enter email"
                 required
               />
@@ -105,17 +145,38 @@ const Login: React.FC = () => {
               <IonInput
                 type="password"
                 value={password}
-                onIonChange={e => setPassword(e.detail.value!)}
+                onIonChange={e => handlePasswordChange(e.detail.value ?? '')}
                 placeholder="Enter password"
                 required
               />
             </IonItem>
 
+            {mode === 'signup' && (
+              <IonItem>
+                <IonLabel position="stacked">Confirm Password</IonLabel>
+                <IonInput
+                  type="password"
+                  value={confirmPassword}
+                  onIonChange={e => handleConfirmPasswordChange(e.detail.value ?? '')}
+                  placeholder="Confirm password"
+                  required
+                />
+              </IonItem>
+            )}
+
+            {error && (
+              <div className="ion-padding-vertical">
+                <IonText color="danger">
+                  <p className="ion-no-margin">{error}</p>
+                </IonText>
+              </div>
+            )}
+
             <IonButton
               expand="block"
               type="submit"
               className="ion-margin-top"
-              disabled={loading}
+              disabled={loading || (mode === 'signup' && !passwordsMatch)}
             >
               {loading ? (
                 <IonSpinner name="crescent" />

@@ -1,5 +1,5 @@
 import { Redirect, Route, RouteProps } from 'react-router-dom';
-import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
+import { IonApp, IonRouterOutlet, setupIonicReact, IonSpinner } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import Home from './pages/Home';
 import Login from './pages/Login';
@@ -43,6 +43,11 @@ interface PrivateRouteProps extends Omit<RouteProps, 'component'> {
   children: React.ReactNode;
 }
 
+const LoginRoute: React.FC = () => {
+  const { user } = useAuth();
+  return user ? <Redirect to="/groups" /> : <Login />;
+};
+
 const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, ...rest }) => {
   const { user, loading } = useAuth();
 
@@ -50,7 +55,16 @@ const PrivateRoute: React.FC<PrivateRouteProps> = ({ children, ...rest }) => {
     <Route
       {...rest}
       render={props =>
-        loading ? null : user ? (
+        loading ? (
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'center', 
+            alignItems: 'center', 
+            height: '100vh' 
+          }}>
+            <IonSpinner />
+          </div>
+        ) : user ? (
           children
         ) : (
           <Redirect to="/login" />
@@ -66,9 +80,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <IonReactRouter>
           <IonRouterOutlet>
-            <Route exact path="/login">
-              <Login />
-            </Route>
+            <Route exact path="/login" component={LoginRoute} />
 
             {/* Group and Activity routes - most specific first */}
             <PrivateRoute exact path="/groups/:groupId/activities/:activityId/edit">
@@ -105,7 +117,7 @@ const App: React.FC = () => {
               <Profile />
             </PrivateRoute>
             <Route exact path="/">
-              <Redirect to="/home" />
+              <Redirect to="/groups" />
             </Route>
           </IonRouterOutlet>
         </IonReactRouter>
